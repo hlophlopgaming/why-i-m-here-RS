@@ -84,7 +84,16 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), SettingsError> {
 	if bytes.len() as u64 + 1 > MAX_SETTINGS_BYTES {
 		return Err(SettingsError::TooLarge);
 	}
-	let directory = path.parent().ok_or(SettingsError::ConfigDirectory)?;
+	let mut bytes = bytes;
+	bytes.push(b'\n');
+	write_atomic(path, &bytes)?;
+	Ok(())
+}
+
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
+	let directory = path
+		.parent()
+		.ok_or_else(|| io::Error::other("missing parent directory"))?;
 	fs::create_dir_all(directory)?;
 	let temporary = directory.join(format!(
 		".settings-{}-{}.tmp",
@@ -100,8 +109,7 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), SettingsError> {
 	}
 	let mut file = options.open(&temporary)?;
 	let result = (|| {
-		file.write_all(&bytes)?;
-		file.write_all(b"\n")?;
+		file.write_all(bytes)?;
 		file.sync_all()?;
 		drop(file);
 		replace(&temporary, path)
@@ -109,7 +117,7 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), SettingsError> {
 	if result.is_err() {
 		let _ = fs::remove_file(&temporary);
 	}
-	Ok(result?)
+	result
 }
 
 #[cfg(target_os = "linux")]

@@ -21,7 +21,7 @@ pub fn wake(thread: u32) -> bool {
 }
 
 #[cfg(windows)]
-pub fn wait_message() -> io::Result<bool> {
+pub fn wait_message() -> io::Result<Message> {
 	let mut message = MSG::default();
 	// SAFETY: GetMessage writes to a valid MSG for this thread.
 	let result = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
@@ -29,14 +29,18 @@ pub fn wait_message() -> io::Result<bool> {
 		return Err(io::Error::last_os_error());
 	}
 	if result == 0 {
-		return Ok(false);
+		return Ok(Message::Quit);
 	}
 	// SAFETY: message was initialized by GetMessage; dispatch runs on the owning thread.
 	unsafe {
 		TranslateMessage(&message);
 		DispatchMessageW(&message);
 	}
-	Ok(true)
+	Ok(if message.message == WM_TIMER && message.hwnd.is_null() {
+		Message::Tick
+	} else {
+		Message::Wake
+	})
 }
 
 pub fn allow_ui_foreground(_pid: u32) {
@@ -44,5 +48,34 @@ pub fn allow_ui_foreground(_pid: u32) {
 	// SAFETY: this grants only our own newly spawned UI permission to request the foreground.
 	unsafe {
 		AllowSetForegroundWindow(_pid);
+	}
+}
+
+#[cfg(windows)]
+pub enum Message {
+	Quit,
+	Tick,
+	Wake,
+}
+
+#[cfg(windows)]
+pub struct Timer(usize, std::marker::PhantomData<std::rc::Rc<()>>);
+#[cfg(windows)]
+impl Timer {
+	pub fn new() -> io::Result<Self> {
+		// SAFETY: Thread timer on the daemon's message-loop thread, owned until Drop.
+		let id = unsafe { SetTimer(std::ptr::null_mut(), 0, 1000, None) };
+		if id == 0 {
+			Err(io::Error::last_os_error())
+		} else {
+			Ok(Self(id, std::marker::PhantomData))
+		}
+	}
+}
+#[cfg(windows)]
+impl Drop for Timer {
+	fn drop(&mut self) {
+		// SAFETY: Stops the thread timer created and owned by this object on the same thread.
+		unsafe { KillTimer(std::ptr::null_mut(), self.0) };
 	}
 }

@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod background;
+mod tracking;
 mod tray;
 
 pub use background::run;
@@ -254,6 +255,8 @@ pub fn run_demo(mut settings: Settings, first_screen: Screen, single_screen: boo
 	}
 	let mut state = UiState {
 		demo: true,
+		backend_available: false,
+		backend_restricted: false,
 		app: settings.tracked_apps[0].clone(),
 		goal: if matches!(screen, Screen::Timer | Screen::Reminder) {
 			tr(settings.language, "Прочитать документацию").into()

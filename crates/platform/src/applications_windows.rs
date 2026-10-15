@@ -13,12 +13,12 @@ use windows::{
 };
 
 // https://learn.microsoft.com/windows/win32/properties/props-system-appusermodel-id
-const APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
+pub(crate) const APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
 	fmtid: windows::core::GUID::from_u128(0x9f4c2855_9f79_4b39_a8d0_e1d42de1d5f3),
 	pid: 5,
 };
 
-struct Apartment;
+pub(crate) struct Apartment;
 impl Drop for Apartment {
 	fn drop(&mut self) {
 		// SAFETY: Created only after successful CoInitializeEx, dropped on the same thread.
@@ -26,9 +26,9 @@ impl Drop for Apartment {
 	}
 }
 
-struct ShellString(PWSTR);
+pub(crate) struct ShellString(pub(crate) PWSTR);
 impl ShellString {
-	fn decode(self) -> io::Result<String> {
+	pub(crate) fn decode(self) -> io::Result<String> {
 		if self.0.is_null() {
 			return Err(io::Error::other("Shell returned a null string"));
 		}
@@ -49,12 +49,7 @@ pub(super) fn enumerate(_language: Language) -> io::Result<Vec<TrackedApp>> {
 		.ok()
 		.map_err(io::Error::other)?;
 	let _apartment = Apartment;
-	// SAFETY: Constant parsing name; returned interfaces own their references through Drop.
-	let folder: IShellItem = unsafe { SHCreateItemFromParsingName(w!("shell:AppsFolder"), None) }
-		.map_err(io::Error::other)?;
-	// SAFETY: The live shell folder supports enumeration; no bind context is needed.
-	let items: IEnumShellItems =
-		unsafe { folder.BindToHandler(None, &BHID_EnumItems) }.map_err(io::Error::other)?;
+	let items = items()?;
 	let mut apps = Vec::new();
 	loop {
 		let mut next = [None];
@@ -79,6 +74,52 @@ pub(super) fn enumerate(_language: Language) -> io::Result<Vec<TrackedApp>> {
 		});
 	}
 	Ok(apps)
+}
+
+pub(crate) fn items() -> io::Result<IEnumShellItems> {
+	// SAFETY: Constant parsing name; returned interfaces own their references through Drop.
+	let folder: IShellItem = unsafe { SHCreateItemFromParsingName(w!("shell:AppsFolder"), None) }
+		.map_err(io::Error::other)?;
+	// SAFETY: The live shell folder supports enumeration; no bind context is needed.
+	let items: IEnumShellItems =
+		unsafe { folder.BindToHandler(None, &BHID_EnumItems) }.map_err(io::Error::other)?;
+	Ok(items)
+}
+
+pub(crate) fn targets(
+	selected: &std::collections::BTreeSet<String>,
+) -> io::Result<Vec<(String, String)>> {
+	let items = items()?;
+	let key = PROPERTYKEY {
+		fmtid: windows::core::GUID::from_u128(0xb9b4b3fc_2b51_4a42_b5d8_324146afcf25),
+		pid: 2,
+	};
+	let mut targets = Vec::new();
+	loop {
+		let mut next = [None];
+		// SAFETY: Single output slot, COM initialized by the caller.
+		unsafe { items.Next(&mut next, None) }.map_err(io::Error::other)?;
+		let Some(item) = next[0].take() else {
+			break;
+		};
+		let item: IShellItem2 = item.cast().map_err(io::Error::other)?;
+		// SAFETY: The live item owns its reference; returned string is freed through RAII.
+		let id =
+			ShellString(unsafe { item.GetString(&APP_USER_MODEL_ID) }.map_err(io::Error::other)?)
+				.decode()?;
+		let id = format!("windows:{id}");
+		if selected.contains(&id) {
+			// SAFETY: Constant link-target string property; missing targets are normal for packaged apps.
+			if let Ok(value) = unsafe { item.GetString(&key) } {
+				if let Ok(path) = ShellString(value).decode() {
+					if std::path::Path::new(&path).is_absolute() {
+						targets.push((id, path));
+					}
+				}
+			}
+		}
+	}
+	Ok(targets)
 }
 
 #[cfg(test)]

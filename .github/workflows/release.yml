@@ -35,6 +35,7 @@ jobs:
             libxkbcommon-dev libdbus-1-dev libpango1.0-dev libcairo2-dev \
             libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
             libxrender-dev libxfixes-dev
+      - run: node kwin/bridge.test.js
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked

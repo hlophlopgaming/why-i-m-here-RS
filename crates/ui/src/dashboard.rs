@@ -36,7 +36,7 @@ impl Dashboard {
 	pub fn save_failed(&mut self) {
 		self.status.set_label(tr(
 			self.language,
-			"Не удалось сохранить настройки. Проверьте права и свободное место; повторите попытку.",
+			"Не удалось сохранить настройки или автозапуск. Проверьте права и свободное место; повторите попытку.",
 		));
 	}
 	pub fn add_app(&mut self, app: TrackedApp) {
@@ -124,7 +124,17 @@ pub(super) fn build(
 			if demo {
 				"Деморежим · KWin / Win32 не подключены"
 			} else {
-				"Настройки сохраняются · KWin / Win32 не подключены"
+				if state.backend_restricted {
+					"Некоторыми окнами нельзя управлять: повышенные права или запрет сворачивания."
+				} else if state.backend_available {
+					"Отслеживание окон подключено"
+				} else if !state.settings.tracking_enabled {
+					"Отслеживание выключено"
+				} else if state.settings.tracked_apps.is_empty() {
+					"Добавьте программы для отслеживания."
+				} else {
+					"Бэкенд окон недоступен. Проверьте KWin и права доступа; сохраните настройки для переподключения."
+				}
 			},
 		),
 	);
@@ -143,7 +153,7 @@ pub(super) fn build(
 			if demo {
 				"Отслеживаемые программы (демосессии)"
 			} else {
-				"Выбранные программы (отслеживание пока недоступно)"
+				"Отслеживаемые программы"
 			},
 		),
 	);
@@ -203,8 +213,16 @@ pub(super) fn build(
 	let mode_row = field(&mut main, tr(language, "При завершении новых сессий"));
 	let mut mode = Choice::default();
 	mode.add_choice(tr(language, "Закрыть окна"));
-	mode.add_choice(tr(language, "Завершить процессы"));
-	mode.set_value(if state.settings.end_mode == EndMode::Kill {
+	if demo {
+		mode.add_choice(tr(language, "Завершить процессы"));
+	} else {
+		mode.deactivate();
+		mode.set_tooltip(tr(
+			language,
+			"Обычное закрытие позволяет программе предложить сохранение документов.",
+		));
+	}
+	mode.set_value(if demo && state.settings.end_mode == EndMode::Kill {
 		1
 	} else {
 		0
@@ -220,7 +238,7 @@ pub(super) fn build(
 			if demo {
 				"Принудительное завершение может потерять несохранённые данные.\nВ деморежиме действие только имитируется."
 			} else {
-				"Настройки не запускают сессии и не закрывают программы."
+				"При запуске выбранной программы появится вопрос о цели. По окончании сессии программа закроется."
 			},
 		),
 	);
@@ -228,11 +246,16 @@ pub(super) fn build(
 	main.fixed(&caution, 38);
 	let mut autostart =
 		CheckButton::default().with_label(tr(language, "Запускать при входе в систему"));
-	autostart.deactivate();
-	autostart.set_tooltip(tr(
-		language,
-		"Будет доступно после подключения платформенного бэкенда.",
-	));
+	autostart.set_value(state.settings.autostart);
+	if demo {
+		autostart.deactivate();
+		autostart.set_tooltip(tr(language, "Автозапуск недоступен в деморежиме."));
+	} else {
+		autostart.set_tooltip(tr(
+			language,
+			"Применяется при сохранении. Запускает приложение в трее без окна.",
+		));
+	}
 	main.fixed(&autostart, 24);
 	let language_row = field(&mut main, tr(language, "Язык следующего UI-процесса"));
 	let mut selected_language = Choice::default();
@@ -259,7 +282,7 @@ pub(super) fn build(
 			if demo {
 				"Активных сессий нет. Выберите программу и откройте форму цели."
 			} else {
-				"Настройки не запускают сессии и не закрывают программы."
+				"При запуске выбранной программы появится вопрос о цели. По окончании сессии программа закроется."
 			},
 		),
 	);
@@ -382,6 +405,7 @@ pub(super) fn build(
 		settings.duration_secs = duration_secs;
 		settings.warning_secs = warning_secs;
 		settings.play_sound = sound.value();
+		settings.autostart = autostart.value();
 		settings.end_mode = if mode.value() == 1 {
 			EndMode::Kill
 		} else {
@@ -429,6 +453,8 @@ mod tests {
 		let (sender, receiver) = fltk::app::channel::<Action>();
 		let state = UiState {
 			demo: false,
+			backend_available: false,
+			backend_restricted: false,
 			app: TrackedApp {
 				id: why_core::APP_ID.into(),
 				name: "Settings".into(),
@@ -436,6 +462,7 @@ mod tests {
 			goal: String::new(),
 			settings: why_core::settings::Settings {
 				tracking_enabled: false,
+				autostart: true,
 				language: Language::En,
 				..Default::default()
 			},

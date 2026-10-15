@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::settings::{Settings, TrackedApp};
 
-pub const PROTOCOL_VERSION: u16 = 5;
+pub const PROTOCOL_VERSION: u16 = 6;
 pub const MAX_MESSAGE_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -31,6 +31,10 @@ impl Screen {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UiState {
 	pub demo: bool,
+	#[serde(default)]
+	pub backend_available: bool,
+	#[serde(default)]
+	pub backend_restricted: bool,
 	pub app: TrackedApp,
 	pub goal: String,
 	pub settings: Settings,

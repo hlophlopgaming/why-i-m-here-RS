@@ -17,7 +17,7 @@ fn normalize(apps: &mut Vec<TrackedApp>) {
 
 #[cfg(windows)]
 #[path = "applications_windows.rs"]
-mod windows;
+pub(crate) mod windows;
 #[cfg(windows)]
 use windows::enumerate;
 

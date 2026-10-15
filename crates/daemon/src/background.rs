@@ -14,7 +14,9 @@ use why_core::{
 	settings::TrackedApp,
 };
 
-enum Event {
+pub(crate) enum Event {
+	WindowsChanged,
+	Tick,
 	Request(Request),
 	Ui(u32, Result<Option<UiMessage>, ipc::IpcError>),
 }
@@ -26,7 +28,7 @@ pub(crate) struct Events {
 	thread: u32,
 }
 impl Events {
-	fn send(&self, event: Event) -> bool {
+	pub(crate) fn send(&self, event: Event) -> bool {
 		if self.sender.send(event).is_err() {
 			return false;
 		}
@@ -40,30 +42,46 @@ impl Events {
 	}
 }
 
-fn receive(receiver: &Receiver<Event>) -> Result<Option<Event>> {
+fn receive(receiver: &Receiver<Event>, ticking: bool) -> Result<Option<Event>> {
 	#[cfg(target_os = "linux")]
-	return Ok(Some(receiver.recv().context("daemon event queue stopped")?));
+	return if ticking {
+		match receiver.recv_timeout(std::time::Duration::from_secs(1)) {
+			Ok(event) => Ok(Some(event)),
+			Err(mpsc::RecvTimeoutError::Timeout) => Ok(Some(Event::Tick)),
+			Err(error) => Err(error).context("daemon event queue stopped"),
+		}
+	} else {
+		Ok(Some(receiver.recv().context("daemon event queue stopped")?))
+	};
 	#[cfg(windows)]
 	loop {
 		match receiver.try_recv() {
 			Ok(event) => return Ok(Some(event)),
 			Err(TryRecvError::Disconnected) => anyhow::bail!("daemon event queue stopped"),
-			Err(TryRecvError::Empty) => {
-				if !platform::desktop::wait_message()? {
-					return Ok(None);
-				}
-			}
+			Err(TryRecvError::Empty) => match platform::desktop::wait_message()? {
+				platform::desktop::Message::Quit => return Ok(None),
+				platform::desktop::Message::Tick if ticking => return Ok(Some(Event::Tick)),
+				_ => {}
+			},
 		}
 	}
 }
 
-fn open_settings(path: &Path, language: Option<Language>, events: &Events) -> Result<UiProcess> {
+fn open_settings(
+	path: &Path,
+	language: Option<Language>,
+	events: &Events,
+	backend_available: bool,
+	restricted: bool,
+) -> Result<UiProcess> {
 	let mut settings = platform::settings::load(path)?;
 	if let Some(language) = language {
 		settings.language = language;
 	}
 	let state = UiState {
 		demo: false,
+		backend_available,
+		backend_restricted: restricted,
 		app: TrackedApp {
 			id: why_core::APP_ID.into(),
 			name: tr(settings.language, "Зачем я здесь?").into(),
@@ -94,19 +112,47 @@ pub fn run(background: bool, language: Option<Language>) -> Result<()> {
 		Request::Show(language)
 	};
 	let instance_events = events.clone();
-	let Some(_instance) =
-		Instance::claim(initial, move |request| instance_events.request(request))?
+	let Some(instance) = Instance::claim(initial, move |request| instance_events.request(request))?
 	else {
 		return Ok(());
 	};
 	let path = platform::settings::settings_path()?;
 	let tray_language = language.unwrap_or(platform::settings::load(&path)?.language);
 	let _tray = tray::Tray::new(tray_language, events.clone()).context("create system tray")?;
+	let settings = platform::settings::load(&path)?;
+	let mut tracking = crate::tracking::Tracking::new(settings.clone(), events.clone());
+	tracking.configure(&instance, settings);
+	#[cfg(windows)]
+	let mut timer = None;
 	let mut ui: Option<UiProcess> = None;
 	let mut catalog_requested = false;
 	events.request(initial);
-	while let Some(event) = receive(&receiver)? {
+	loop {
+		#[cfg(windows)]
+		if tracking.ticking() && timer.is_none() {
+			timer = Some(platform::desktop::Timer::new()?);
+		} else if !tracking.ticking() {
+			timer = None;
+		}
+		let Some(event) = receive(&receiver, tracking.ticking())? else {
+			break;
+		};
 		match event {
+			Event::WindowsChanged => {
+				if let Err(error) = tracking.refresh() {
+					eprintln!("window tracking: {error:#}");
+				}
+			}
+			Event::Tick => {
+				if let Err(error) = tracking.tick() {
+					eprintln!("session tick: {error:#}");
+				}
+			}
+			Event::Ui(pid, message) if tracking.owns_ui(pid) => {
+				if let Err(error) = tracking.message(pid, message) {
+					eprintln!("session UI: {error:#}");
+				}
+			}
 			Event::Request(Request::Quit) => break,
 			Event::Request(Request::Background) => {}
 			Event::Request(Request::Show(language)) => {
@@ -114,7 +160,14 @@ pub fn run(background: bool, language: Option<Language>) -> Result<()> {
 					platform::desktop::allow_ui_foreground(ui.child.id());
 					ui.send(&DaemonMessage::Present)
 				} else {
-					open_settings(&path, language, &events).map(|process| {
+					open_settings(
+						&path,
+						language,
+						&events,
+						tracking.available(),
+						tracking.restricted,
+					)
+					.map(|process| {
 						ui = Some(process);
 						catalog_requested = false;
 					})
@@ -138,7 +191,11 @@ pub fn run(background: bool, language: Option<Language>) -> Result<()> {
 						}
 					}
 					Ok(Some(UiMessage::SaveSettings { settings })) => {
-						let result = platform::settings::save(&path, &settings);
+						let result =
+							save_settings(&path, &settings, platform::autostart::set_enabled);
+						if result.is_ok() {
+							tracking.configure(&instance, settings);
+						}
 						if let Err(error) = &result {
 							eprintln!("save settings {}: {error}", path.display());
 						}
@@ -161,8 +218,78 @@ pub fn run(background: bool, language: Option<Language>) -> Result<()> {
 				}
 			}
 		}
+		if tracking.ticking() {
+			if let Err(error) = tracking.tick() {
+				eprintln!("session tick: {error:#}");
+			}
+		}
 	}
 	// Drop only our UI child before unregistering the tray and instance endpoint.
 	drop(ui);
+	drop(tracking);
 	Ok(())
+}
+
+fn save_settings(
+	path: &Path,
+	settings: &why_core::settings::Settings,
+	configure: impl FnOnce(bool) -> std::io::Result<()>,
+) -> Result<()> {
+	let previous = platform::settings::load(path)?;
+	platform::settings::save(path, settings)?;
+	if let Err(error) = configure(settings.autostart) {
+		platform::settings::save(path, &previous)
+			.context("restore settings after autostart failure")?;
+		return Err(error).context("configure autostart");
+	}
+	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::{fs, io};
+	use why_core::settings::Settings;
+
+	#[test]
+	fn failed_autostart_restores_preferences_and_keeps_unknown_fields() {
+		let directory =
+			std::env::temp_dir().join(format!("why-here-save-autostart-{}", std::process::id()));
+		fs::create_dir_all(&directory).unwrap();
+		let path = directory.join("settings.json");
+		fs::write(&path, r#"{"future":{"keep":true}}"#).unwrap();
+		let previous = platform::settings::load(&path).unwrap();
+		let updated = Settings {
+			autostart: true,
+			duration_secs: 300,
+			..previous.clone()
+		};
+		assert!(save_settings(&path, &updated, |enabled| {
+			assert!(enabled);
+			Err(io::Error::new(
+				io::ErrorKind::PermissionDenied,
+				"test failure",
+			))
+		})
+		.is_err());
+		assert_eq!(platform::settings::load(&path).unwrap(), previous);
+		let document: serde_json::Value =
+			serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+		assert_eq!(document["future"]["keep"], true);
+		save_settings(&path, &updated, |enabled| {
+			assert!(enabled);
+			Ok(())
+		})
+		.unwrap();
+		assert_eq!(platform::settings::load(&path).unwrap(), updated);
+		let invalid = Settings {
+			duration_secs: 0,
+			..updated
+		};
+		assert!(save_settings(&path, &invalid, |_| panic!(
+			"must not configure invalid preferences"
+		))
+		.is_err());
+		fs::remove_dir_all(directory).unwrap();
+	}
 }

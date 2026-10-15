@@ -88,7 +88,6 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 	};
 	if requested != screen
 		|| state.settings.validate().is_err()
-		|| (!state.demo && screen != Screen::Settings)
 		|| !state.app.is_valid()
 		|| state.goal.chars().count() > 1024
 	{
@@ -215,7 +214,11 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 							if warning {
 								"Время заканчивается"
 							} else {
-								"Демосессия"
+								if state.demo {
+									"Демосессия"
+								} else {
+									"Сессия"
+								}
 							},
 						));
 					}
@@ -264,7 +267,11 @@ fn goal_form(state: &UiState, sender: app::Sender<Action>, window: &mut Window) 
 		38,
 		tr(
 			language,
-			"Деморежим: другие программы и настройки не изменяются.",
+			if state.demo {
+				"Деморежим: другие программы и настройки не изменяются."
+			} else {
+				"Программа скрыта до ответа. Закрытие вопроса закроет программу."
+			},
 		),
 	);
 	text(
@@ -274,12 +281,16 @@ fn goal_form(state: &UiState, sender: app::Sender<Action>, window: &mut Window) 
 		40,
 		tr(
 			language,
-			match state.settings.end_mode {
-				EndMode::CloseWindows => {
-					"До начала сессии форму нельзя закрыть. Введите цель и время."
-				}
-				EndMode::Kill => {
-					"Закрытие формы или Escape имитирует завершение программы без сохранения."
+			if !state.demo {
+				"Закрытие вопроса закроет программу. После ответа начнётся таймер."
+			} else {
+				match state.settings.end_mode {
+					EndMode::CloseWindows => {
+						"До начала сессии форму нельзя закрыть. Введите цель и время."
+					}
+					EndMode::Kill => {
+						"Закрытие формы или Escape имитирует завершение программы без сохранения."
+					}
 				}
 			},
 		),
@@ -316,9 +327,16 @@ fn goal_form(state: &UiState, sender: app::Sender<Action>, window: &mut Window) 
 		}));
 	});
 	let mode = state.settings.end_mode;
-	window.set_callback(move |_| match mode {
-		EndMode::Kill => sender.send(Action::Reply(UiMessage::GoalCancelled)),
-		EndMode::CloseWindows => close_error.set_label(tr(language, "Сначала введите цель")),
+	let demo = state.demo;
+	window.set_callback(move |_| {
+		if !demo {
+			sender.send(Action::Reply(UiMessage::GoalCancelled));
+			return;
+		}
+		match mode {
+			EndMode::Kill => sender.send(Action::Reply(UiMessage::GoalCancelled)),
+			EndMode::CloseWindows => close_error.set_label(tr(language, "Сначала введите цель")),
+		}
 	});
 }
 
@@ -340,7 +358,20 @@ fn session_panel(
 		22,
 		&time_label(u64::from(state.settings.duration_secs)),
 	);
-	let mut status = text(150, 64, 194, 22, tr(language, "Демосессия"));
+	let mut status = text(
+		150,
+		64,
+		194,
+		22,
+		tr(
+			language,
+			if state.demo {
+				"Демосессия"
+			} else {
+				"Сессия"
+			},
+		),
+	);
 	status.set_label_color(theme::MUTED);
 	text(
 		16,
@@ -355,7 +386,7 @@ fn session_panel(
 			},
 		),
 	);
-	let mut end = button(12, 126, 336, 30, tr(language, "Завершить сессию сейчас"));
+	let mut end = button(12, 126, 336, 30, tr(language, "Закончить сессию"));
 	end.set_callback(move |_| sender.send(Action::Reply(UiMessage::EndNow)));
 	let mut drag = None;
 	window.handle(move |window, event| match event {

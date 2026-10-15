@@ -31,10 +31,12 @@ Built in Rust with fltk-rs, targeting **KDE Plasma 6 / Wayland** and **Windows 1
 The application works locally, with no account, server or network requests.
 
 > [!IMPORTANT]
-> **Tray, persistent preferences and demo mode are available.** Goal entry, timers, installed-app selection and
-> warning sounds work. Closing windows and terminating applications are simulated.
-> Demo settings stay in memory; other applications are left untouched.
-> Normal startup opens preferences and stays in the tray; window tracking is not connected yet.
+> **Current sources support real sessions, the tray, settings and autostart.**
+> Selected applications are minimized behind the goal/time question. Answering shows
+> the application and its timer. Closing the question, timer expiry or **Finish session**
+> sends a normal close request to all application windows; the app can offer to save documents.
+> Demo mode leaves other applications untouched.
+> Published `v0.1.0` contains the earlier demo; these new features require building from source.
 
 ## Quick start
 
@@ -54,7 +56,7 @@ cargo run --release -p app -- --demo --show --language en
 1. Select a demo application, or choose **From installed apps…**.
 2. Set a duration and warning interval, then choose **Open goal form**.
 3. Write your goal and press **Start**. Drag the compact session panel wherever
-   it is useful; **End session now** simulates finishing early.
+   it is useful; **Finish session** simulates finishing early.
 
 **15 minutes** by default · **5 / 15 / 30** minute presets · Russian and English UI
 
@@ -88,7 +90,7 @@ cargo run --release -p app -- --demo --show --language en
 - No countdown runs until you submit a goal.
 - In **Close windows** mode, the goal form cannot be dismissed. In **Terminate
   processes** mode, closing it or pressing Escape simulates ending the application.
-- The session's end mode is fixed when it is created. **End session now** shows
+- The session's end mode is fixed when it is created. **Finish session** shows
   the simulated result; Escape on the timer panel cancels without that action.
 - **Try again** opens another goal form with the previous goal.
 - A warning interval of **0** disables advance warning. Sound is off by default;
@@ -98,8 +100,9 @@ cargo run --release -p app -- --demo --show --language en
   desktop entries; Windows enumerates the current user's AppsFolder via COM without
   starting PowerShell. Selection never
   executes a desktop entry or launches an app.
-- KWin/Win32 reconnection, opacity and autostart controls are visibly disabled
-  until their integrations exist. The dashboard's session area is initially empty:
+- Opacity and the separate reconnect button remain disabled. Save preferences
+  again to reconnect the backend. Autostart is available in normal preferences and
+  disabled in demo mode. The dashboard's session area is initially empty:
   this demo starts one simulated session after you leave the dashboard.
 
 </details>
@@ -173,7 +176,7 @@ Windows application still needs runtime verification.
 | `cargo run -p app -- ui timer --demo` | A standalone timer preview |
 
 Use `reminder` or `settings` instead of `goal` to preview those screens.
-The timer preview exits on expiry or **End session now**. `--help` lists commands;
+The timer preview exits on expiry or **Finish session**. `--help` lists commands;
 `--version` prints the workspace version. Without `--demo`, `ui` is an internal
 mode requiring initialization over stdin.
 
@@ -181,7 +184,7 @@ mode requiring initialization over stdin.
 Selected applications, language and future session parameters are saved. Closing
 the window or choosing **Close settings** discards edits. Closing preferences
 ends only the UI process; the daemon stays in the tray. Use **Quit application**
-in the tray menu to exit. This panel cannot start sessions yet.
+in the tray menu to exit. Launching a selected application after saving automatically opens its goal question.
 `--language ru|en` overrides the stored language for this opening; it is written
 only when saving.
 
@@ -199,27 +202,45 @@ Single-instance routing uses D-Bus on Linux and a named mutex/pipe on Windows.
 Linux requires a session D-Bus bus and a StatusNotifierHost, such as Plasma.
 Running the demo does not install the app or add it to autostart.
 
+
+**Real sessions:** run `cargo run -p app -- --show`, select an installed app,
+enable tracking and save. Existing windows are discovered too. All windows of
+one app share a goal and timer. Windows stay minimized until you answer. Launching
+after all windows have closed starts a new session. **Finish session** closes the
+app early; closing only the timer panel keeps the countdown running. Disabling
+tracking, removing an app or quitting the utility restores windows and cancels
+sessions without closing apps. Forced process termination remains a demo simulation.
+
+**Autostart:** enable **Start when signing in** in normal preferences and choose **Save
+and close**. It registers the current binary with `--background` using the XDG
+`autostart/org.local.WhyHere.desktop` file (respecting `XDG_CONFIG_HOME`) or
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\WhyHere`. Unchecking removes
+the entry when saving. After moving the binary, save enabled autostart again from
+its new location. Windows Run commands longer than 260 characters are rejected
+without deleting the previous registration.
+
+**Limits:** Win32 may briefly show a window before it is minimized. Elevated or
+non-minimizable windows are not blocked; preferences show the restriction. Classic
+Windows apps use the window/process AppID or an unambiguous full executable path
+from AppsFolder; ambiguous matches are skipped. Save preferences again after a
+KWin restart to reconnect.
+
 </details>
 
 ## Roadmap
 
-- [x] Persist settings with backward-compatible loading.
-- [ ] Connect goal history to real sessions (demo history remains temporary).
-- [x] Add the tray and single-instance routing.
-- [ ] Connect real window tracking and blocking through KWin and Win32.
-- [ ] Implement window closing and protected process-tree termination.
-- [ ] Validate both platforms on real desktops and track memory regressions.
-- [ ] Add autostart, packaging and releases.
+- [x] Connect real window tracking and blocking through KWin and Win32.
 
 ### Platform status
 
 | Platform | Verified | Still to verify |
 | :--- | :--- | :--- |
-| **KDE Plasma 6 / Wayland** | Native UI and picker, app ID, IPC, catalog selection; PipeWire playback at zero stream volume | Real window control, suspend/resume, full desktop integration |
-| **Windows 10 / 11** | Cross-compilation of `core`, `platform` and `daemon`; AppsFolder catalog in Windows CI | GUI, Start menu catalog, audible playback and real window control |
+| **KDE Plasma 6 / Wayland** | Native KWin: two fixture windows, blocking, restoration and closing; IPC, catalog | Suspend/resume and audible playback |
+| **Windows 10 / 11** | Backend and test cross-compilation; AppsFolder catalog | Interactive Win32, UWP/UIPI, login autostart and sound |
 
 The fixed **8 MiB daemon / 15 MiB UI** limits have been retired. We track
-reproducible measurements and memory regressions instead. The latest release
+reproducible measurements and memory regressions instead. The measurements below
+precede real window backend integration. The latest release
 optimization reduced daemon RSS by approximately **7–9%** and binary size by
 **30%**. On the measured Linux desktop, the background daemon uses about
 **10.6 MiB RSS** and preferences about **30 MiB**. These are point-in-time Linux

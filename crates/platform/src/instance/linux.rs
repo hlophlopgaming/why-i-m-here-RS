@@ -24,6 +24,10 @@ pub struct Instance {
 }
 
 impl Instance {
+	pub(crate) fn connection(&self) -> &Connection {
+		&self._connection
+	}
+
 	/// Returns None after forwarding to the existing owner; never queues for ownership.
 	pub fn claim(
 		request: Request,

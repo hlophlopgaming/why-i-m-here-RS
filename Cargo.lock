@@ -284,6 +284,7 @@ dependencies = [
  "core",
  "ksni",
  "platform",
+ "serde_json",
  "tray-icon",
 ]
 

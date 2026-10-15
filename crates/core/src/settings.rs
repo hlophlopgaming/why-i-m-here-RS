@@ -42,6 +42,7 @@ pub struct Settings {
 	pub tracking_enabled: bool,
 	pub warning_secs: u32,
 	pub play_sound: bool,
+	pub autostart: bool,
 	pub tracked_apps: Vec<TrackedApp>,
 }
 
@@ -55,6 +56,7 @@ impl Default for Settings {
 			tracking_enabled: true,
 			warning_secs: 2 * 60,
 			play_sound: false,
+			autostart: false,
 			tracked_apps: Vec::new(),
 		}
 	}
@@ -157,6 +159,7 @@ mod tests {
 	#[test]
 	fn old_settings_keep_defaults_for_new_fields() {
 		let settings: Settings = serde_json::from_str(r#"{"duration_secs":120}"#).unwrap();
+		assert!(!settings.autostart);
 		assert_eq!(settings.duration_secs, 120);
 		assert_eq!(settings.language, Language::Ru);
 		assert_eq!(settings.end_mode, EndMode::CloseWindows);

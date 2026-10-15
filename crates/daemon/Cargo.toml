@@ -14,3 +14,6 @@ ksni = { version = "0.3", default-features = false, features = ["blocking", "asy
 
 [target.'cfg(windows)'.dependencies]
 tray-icon = { version = "0.26", default-features = false }
+
+[dev-dependencies]
+serde_json.workspace = true

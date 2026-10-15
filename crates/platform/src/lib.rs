@@ -3,10 +3,13 @@ use std::io;
 use thiserror::Error;
 
 pub mod applications;
+pub mod autostart;
 pub mod desktop;
 pub mod instance;
 pub mod settings;
 pub mod sound;
+pub mod windows;
+pub use windows::WindowBackend;
 
 #[derive(Debug, Error)]
 pub enum PlatformError {

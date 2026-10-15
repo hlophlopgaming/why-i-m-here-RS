@@ -13,6 +13,22 @@ pub fn tr(language: Language, source: &'static str) -> &'static str {
 		return source;
 	}
 	match source {
+		"Автозапуск недоступен в деморежиме." => "Autostart is unavailable in demo mode.",
+		"Применяется при сохранении. Запускает приложение в трее без окна." => "Applied when saving. Starts in the tray without a window.",
+		"Не удалось сохранить настройки или автозапуск. Проверьте права и свободное место; повторите попытку." => "Unable to save settings or autostart. Check permissions and free space, then retry.",
+		"Закончить сессию" => "Finish session",
+		"Сессия" => "Session",
+		"Программа скрыта до ответа. Закрытие вопроса закроет программу." => "The application is hidden until you answer. Closing this question closes the application.",
+		"Закрытие вопроса закроет программу. После ответа начнётся таймер." => "Closing this question closes the application. The timer starts after you answer.",
+		"Некоторыми окнами нельзя управлять: повышенные права или запрет сворачивания." => "Some windows cannot be controlled: elevated privileges or minimizing is unavailable.",
+		"Отслеживание окон подключено" => "Window tracking is connected",
+		"Отслеживание выключено" => "Tracking is disabled",
+		"Добавьте программы для отслеживания." => "Add applications to track.",
+		"Бэкенд окон недоступен. Проверьте KWin и права доступа; сохраните настройки для переподключения." => "Window backend unavailable. Check KWin and permissions; save settings to reconnect.",
+		"Отслеживаемые программы" => "Tracked applications",
+		"При запуске выбранной программы появится вопрос о цели. По окончании сессии программа закроется." => "Launching a selected application opens a goal question. The application closes when the session ends.",
+		"Обычное закрытие позволяет программе предложить сохранение документов." => "Normal closing lets the application offer to save documents.",
+		"Доступны отслеживание окон, таймер, трей, настройки и деморежим." => "Window tracking, timer, tray, settings and demo mode are available.",
 		"Зачем я здесь?" => "Why am I here?",
 		"Доступен деморежим. KWin, Win32 и трей пока не подключены." => {
 			"Demo mode is available. KWin, Win32 and tray are not connected yet."

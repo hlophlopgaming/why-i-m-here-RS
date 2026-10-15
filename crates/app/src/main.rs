@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use anyhow::{bail, Result};
 use why_core::{
@@ -89,7 +90,7 @@ fn run() -> Result<()> {
 				"{}",
 				tr(
 					Language::Ru,
-					"Доступны трей, настройки и деморежим. Отслеживание окон пока не подключено."
+					"Доступны отслеживание окон, таймер, трей, настройки и деморежим."
 				)
 			);
 		}
