@@ -31,12 +31,12 @@ Built in Rust with fltk-rs, targeting **KDE Plasma 6 / Wayland** and **Windows 1
 The application works locally, with no account, server or network requests.
 
 > [!IMPORTANT]
-> **Current sources support real sessions, the tray, settings and autostart.**
+> **Release v0.2.0 supports real sessions, the tray, settings and autostart.**
 > Selected applications are minimized behind the goal/time question. Answering shows
 > the application and its timer. Closing the question, timer expiry or **Finish session**
 > sends a normal close request to all application windows; the app can offer to save documents.
 > Demo mode leaves other applications untouched.
-> Published `v0.1.0` contains the earlier demo; these new features require building from source.
+> Release `v0.1.0` contains the earlier demo.
 
 ## Quick start
 
@@ -203,7 +203,7 @@ Linux requires a session D-Bus bus and a StatusNotifierHost, such as Plasma.
 Running the demo does not install the app or add it to autostart.
 
 
-**Real sessions:** run `cargo run -p app -- --show`, select an installed app,
+**Real sessions:** run `why-here --show` (Windows: `why-here.exe --show`), select an installed app,
 enable tracking and save. Existing windows are discovered too. All windows of
 one app share a goal and timer. Windows stay minimized until you answer. Launching
 after all windows have closed starts a new session. **Finish session** closes the

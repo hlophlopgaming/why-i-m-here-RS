@@ -91,10 +91,10 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           cat > notes.md <<'NOTES'
-          Предварительная версия: трей, сохраняемые настройки, каталог программ и безопасный деморежим. Управление чужими окнами и процессами пока не подключено.
+          Предварительная версия: реальные сессии, трей, сохраняемые настройки, автозапуск и безопасный деморежим. Окна выбранной программы сворачиваются до ответа на вопрос о цели; по завершении сессии отправляется обычный запрос закрытия окон с возможностью сохранить документы. Принудительное завершение процессов доступно только как имитация в деморежиме.
 
-          Каталог Windows читает AppsFolder через COM без PowerShell. Оптимизированы каталог Linux, IPC и иконка трея. Жёсткие лимиты RSS заменены воспроизводимыми замерами (BENCHMARKS.md). Раскрутка стека сохранена для изоляции паник рабочих потоков.
+          Linux: KWin/Wayland. Windows: Win32, включая AppsFolder через COM. Интерактивную работу Windows GUI/UWP/UIPI и автозапуск при входе в ОС ещё нужно проверить вручную. См. TESTING.md.
 
-          Preview: tray, persistent settings, application catalog and safe demo mode. Real window/process control is not connected yet. Windows catalog uses AppsFolder via COM; Linux catalog, IPC and tray icon allocations are reduced. See README for runtime dependencies and platform limitations.
+          Preview: real sessions, tray, persistent settings, autostart, and safe demo mode. Selected app windows stay minimized until the goal question is answered; finishing a session sends normal close requests so apps can offer to save documents. Forced process termination remains a demo simulation. Linux uses KWin/Wayland; Windows uses Win32 and the AppsFolder catalog. Interactive Windows GUI/UWP/UIPI and login autostart still need manual validation. See README and TESTING.md.
           NOTES
           gh release create "$RELEASE_TAG" dist/* --verify-tag --prerelease --title "Why am I here? $RELEASE_TAG (preview)" --notes-file notes.md
