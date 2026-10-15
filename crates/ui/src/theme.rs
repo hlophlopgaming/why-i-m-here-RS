@@ -32,7 +32,8 @@ pub fn button(x: i32, y: i32, w: i32, h: i32, value: &str) -> Button {
 	let mut button = Button::new(x, y, w, h, value);
 	button.set_color(Color::from_hex(0x383d41));
 	button.set_selection_color(ACCENT);
-	button.set_frame(FrameType::ThinUpBox);
+	button.set_frame(FrameType::FlatBox);
+	button.set_down_frame(FrameType::FlatBox);
 	button.set_label_size(13);
 	button
 }
