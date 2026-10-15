@@ -22,14 +22,10 @@ impl ksni::Tray for Item {
 		self.events.request(Request::Show(None));
 	}
 	fn icon_pixmap(&self) -> Vec<ksni::Icon> {
-		let mut argb = super::ICON.to_vec();
-		for pixel in argb.as_chunks_mut::<4>().0 {
-			pixel.rotate_right(1);
-		}
 		vec![ksni::Icon {
 			width: 32,
 			height: 32,
-			data: argb,
+			data: ARGB.to_vec(),
 		}]
 	}
 	fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
@@ -65,5 +61,33 @@ impl Tray {
 impl Drop for Tray {
 	fn drop(&mut self) {
 		self.0.shutdown().wait();
+	}
+}
+
+const ARGB: [u8; 32 * 32 * 4] = {
+	let mut bytes = *super::ICON;
+	let mut i = 0;
+	while i < bytes.len() {
+		bytes[i] = super::ICON[i + 3];
+		bytes[i + 1] = super::ICON[i];
+		bytes[i + 2] = super::ICON[i + 1];
+		bytes[i + 3] = super::ICON[i + 2];
+		i += 4;
+	}
+	bytes
+};
+
+#[cfg(test)]
+mod tests {
+	#[test]
+	fn icon_is_argb() {
+		for (rgba, argb) in super::super::ICON
+			.as_chunks::<4>()
+			.0
+			.iter()
+			.zip(super::ARGB.as_chunks::<4>().0.iter())
+		{
+			assert_eq!(*argb, [rgba[3], rgba[0], rgba[1], rgba[2]]);
+		}
 	}
 }

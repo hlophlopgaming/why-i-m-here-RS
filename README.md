@@ -38,7 +38,13 @@ The application works locally, with no account, server or network requests.
 
 ## Quick start
 
-Install the [build prerequisites](#build), then open the dashboard:
+Download Linux x86_64 and Windows x86_64 archives from [Releases](https://github.com/hlophlopgaming/why-i-m-here-RS/releases).
+Extract and run `why-here --demo --show` (Windows: `why-here.exe --demo --show`).
+The Linux build requires glibc 2.35+ and Wayland/X11, Pango/Cairo, fontconfig
+and libdecor libraries; this is a portable archive, not an installer. Windows does not need separate FLTK libraries.
+Archive checksums are provided in the release's `SHA256SUMS` file.
+
+To run from source, install the [build prerequisites](#build):
 
 ```bash
 cargo run --release -p app -- --demo --show --language en
@@ -88,7 +94,8 @@ cargo run --release -p app -- --demo --show --language en
   when enabled, the embedded WAV plays once at the warning or at expiry if no
   warning has played yet. Sound errors do not stop the timer.
 - The installed-app catalog loads only on request, in a worker. Linux reads XDG
-  desktop entries; Windows reads the current user's Start menu. Selection never
+  desktop entries; Windows enumerates the current user's AppsFolder via COM without
+  starting PowerShell. Selection never
   executes a desktop entry or launches an app.
 - KWin/Win32 reconnection, opacity and autostart controls are visibly disabled
   until their integrations exist. The dashboard's session area is initially empty:
@@ -200,7 +207,7 @@ Running the demo does not install the app or add it to autostart.
 - [x] Add the tray and single-instance routing.
 - [ ] Connect real window tracking and blocking through KWin and Win32.
 - [ ] Implement window closing and protected process-tree termination.
-- [ ] Meet the memory budgets and validate both platforms on real desktops.
+- [ ] Validate both platforms on real desktops and track memory regressions.
 - [ ] Add autostart, packaging and releases.
 
 ### Platform status
@@ -210,7 +217,8 @@ Running the demo does not install the app or add it to autostart.
 | **KDE Plasma 6 / Wayland** | Native UI and picker, app ID, IPC, catalog selection; PipeWire playback at zero stream volume | Real window control, suspend/resume, full desktop integration |
 | **Windows 10 / 11** | Cross-compilation of `core`, `platform` and `daemon`; Windows CI configured | GUI, Start menu catalog, audible playback and real window control |
 
-The **8 MiB daemon / 15 MiB UI** targets are not met yet. The latest release
+The fixed **8 MiB daemon / 15 MiB UI** limits have been retired. We track
+reproducible measurements and memory regressions instead. The latest release
 optimization reduced daemon RSS by approximately **7–9%** and binary size by
 **30%**. On the measured Linux desktop, the background daemon uses about
 **10.6 MiB RSS** and preferences about **30 MiB**. These are point-in-time Linux

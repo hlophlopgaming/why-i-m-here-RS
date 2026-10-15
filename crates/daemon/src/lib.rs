@@ -123,11 +123,11 @@ impl UiProcess {
 				};
 				match result {
 					Ok(apps) => {
-						for chunk in apps.chunks(8) {
+						for chunk in apps.chunks(16) {
 							if ipc::write_message(
 								&mut *stdin,
-								&DaemonMessage::InstalledApps {
-									apps: chunk.to_vec(),
+								&ipc::InstalledApps {
+									apps: chunk,
 									complete: false,
 									error: None,
 								},
@@ -139,8 +139,8 @@ impl UiProcess {
 						}
 						let _ = ipc::write_message(
 							&mut *stdin,
-							&DaemonMessage::InstalledApps {
-								apps: Vec::new(),
+							&ipc::InstalledApps {
+								apps: &[],
 								complete: true,
 								error: None,
 							},
@@ -150,10 +150,10 @@ impl UiProcess {
 						eprintln!("installed apps: {error}");
 						let _ = ipc::write_message(
 							&mut *stdin,
-							&DaemonMessage::InstalledApps {
-								apps: Vec::new(),
+							&ipc::InstalledApps {
+								apps: &[],
 								complete: true,
-								error: Some("catalog unavailable".into()),
+								error: Some("catalog unavailable"),
 							},
 						);
 					}

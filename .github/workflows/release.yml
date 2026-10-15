@@ -1,0 +1,99 @@
+name: Release binaries
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check release version
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--no-deps', '--format-version=1']))
+          version = next(p['version'] for p in metadata['packages'] if p['name'] == 'app')
+          assert os.environ['GITHUB_REF_NAME'] == 'v' + version, 'Tag must match workspace version'
+          PY
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libwayland-dev wayland-protocols \
+            libxkbcommon-dev libdbus-1-dev libpango1.0-dev libcairo2-dev \
+            libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev \
+            libxrender-dev libxfixes-dev
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo build --release -p app --locked
+      - run: ./target/release/why-here --version
+      - name: Verify native Wayland backend
+        if: runner.os == 'Linux'
+        run: >-
+          python -c "from pathlib import Path;
+          assert any('#define FLTK_USE_WAYLAND 1' in p.read_text()
+          for p in Path('target/release/build').glob('fltk-sys-*/out/include/FL/fl_config.h')),
+          'FLTK was built without native Wayland support'"
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/release/why-here dist/
+          cp README.md README.ru.md LICENSE dist/
+          tar -C dist -czf why-here-linux-x86_64.tar.gz why-here README.md README.ru.md LICENSE
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist
+          Copy-Item target/release/why-here.exe, README.md, README.ru.md, LICENSE dist/
+          Compress-Archive -Path dist/* -DestinationPath why-here-windows-x86_64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: why-here-${{ runner.os }}
+          path: |
+            why-here-linux-x86_64.tar.gz
+            why-here-windows-x86_64.zip
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum *.tar.gz *.zip > SHA256SUMS
+      - name: Publish preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Предварительная версия: трей, сохраняемые настройки, каталог программ и безопасный деморежим. Управление чужими окнами и процессами пока не подключено.
+
+          Каталог Windows читает AppsFolder через COM без PowerShell. Оптимизированы каталог Linux, IPC и иконка трея. Жёсткие лимиты RSS заменены воспроизводимыми замерами (BENCHMARKS.md). Раскрутка стека сохранена для изоляции паник рабочих потоков.
+
+          Preview: tray, persistent settings, application catalog and safe demo mode. Real window/process control is not connected yet. Windows catalog uses AppsFolder via COM; Linux catalog, IPC and tray icon allocations are reduced. See README for runtime dependencies and platform limitations.
+          NOTES
+          gh release create "$RELEASE_TAG" dist/* --verify-tag --prerelease --title "Why am I here? $RELEASE_TAG (preview)" --notes-file notes.md

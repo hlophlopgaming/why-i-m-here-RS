@@ -58,6 +58,15 @@ pub enum DaemonMessage {
 	},
 }
 
+/// Borrowed catalog response; wire-compatible with `DaemonMessage::InstalledApps`.
+#[derive(Serialize)]
+#[serde(tag = "type", rename = "installed_apps")]
+pub struct InstalledApps<'a> {
+	pub apps: &'a [TrackedApp],
+	pub complete: bool,
+	pub error: Option<&'a str>,
+}
+
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UiMessage {
@@ -124,6 +133,41 @@ pub fn write_message<T: Serialize>(writer: &mut impl Write, payload: &T) -> Resu
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn borrowed_catalog_fits_frame_and_matches_owned_response() {
+		let apps = vec![
+			TrackedApp {
+				id: "\\".repeat(512),
+				name: "😀".repeat(128)
+			};
+			16
+		];
+		assert!(apps.iter().all(TrackedApp::is_valid));
+		for error in [None, Some("catalog unavailable")] {
+			let mut bytes = Vec::new();
+			write_message(
+				&mut bytes,
+				&InstalledApps {
+					apps: &apps,
+					complete: true,
+					error,
+				},
+			)
+			.unwrap();
+			let Some(DaemonMessage::InstalledApps {
+				apps: actual,
+				complete,
+				error: actual_error,
+			}) = read_message(&mut bytes.as_slice()).unwrap()
+			else {
+				panic!("wrong response")
+			};
+			assert_eq!(actual, apps);
+			assert!(complete);
+			assert_eq!(actual_error.as_deref(), error);
+		}
+	}
 
 	#[test]
 	fn round_trip_keeps_embedded_newlines_in_one_frame() {
