@@ -39,6 +39,7 @@ pub enum UiError {
 }
 
 enum Action {
+	Present,
 	OpenPicker,
 	AddApp(TrackedApp),
 	InstalledApps(Vec<TrackedApp>, bool, bool),
@@ -100,6 +101,7 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 		.name("daemon-ipc".into())
 		.spawn(move || loop {
 			match ipc::read_message::<DaemonMessage>(&mut reader) {
+				Ok(Some(DaemonMessage::Present)) => sender.send(Action::Present),
 				Ok(Some(DaemonMessage::SettingsSaved { success })) => {
 					sender.send(Action::SettingsSaved(success))
 				}
@@ -160,6 +162,10 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 	while application.wait() {
 		while let Some(action) = receiver.recv() {
 			match action {
+				Action::Present => {
+					window.show();
+					let _ = window.take_focus();
+				}
 				Action::OpenPicker if dashboard.is_some() => {
 					if picker.is_none() {
 						picker = Some(picker::AppPicker::new(language, sender));

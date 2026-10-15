@@ -111,6 +111,9 @@ pub fn tr(language: Language, source: &'static str) -> &'static str {
 		"Выбор добавит программу в список. Она не будет запущена или завершена." => "Selection adds the app to the list. It will not be launched or terminated.",
 		"Доступны деморежим и сохранение настроек (--show). KWin, Win32 и трей пока не подключены." => "Demo mode and saved settings (--show) are available. KWin, Win32 and tray are not connected yet.",
 		"Отслеживание пока недоступно. Запустите why-here --demo или why-here --show." => "Tracking is not available yet. Run why-here --demo or why-here --show.",
+		"Выйти из приложения" => "Quit application",
+		"Закрыть настройки" => "Close settings",
+		"Доступны трей, настройки и деморежим. Отслеживание окон пока не подключено." => "Tray, preferences and demo mode are available. Window tracking is not connected yet.",
 		_ => source,
 	}
 }

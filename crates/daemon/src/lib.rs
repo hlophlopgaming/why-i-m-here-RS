@@ -1,5 +1,10 @@
 #![forbid(unsafe_code)]
 
+mod background;
+mod tray;
+
+pub use background::run;
+
 use std::{
 	io::BufReader,
 	process::{Child, ChildStdin, Command, Stdio},
@@ -19,8 +24,11 @@ use why_core::{
 	settings::{Settings, TrackedApp},
 };
 
+type UiNotification = Box<dyn Fn(u32, Result<Option<UiMessage>, ipc::IpcError>) + Send>;
+
 struct UiProcess {
 	child: Child,
+	language: why_core::i18n::Language,
 	stdin: Arc<Mutex<ChildStdin>>,
 	events: Receiver<Result<Option<UiMessage>, ipc::IpcError>>,
 }
@@ -32,6 +40,14 @@ enum Event {
 
 impl UiProcess {
 	fn spawn(screen: Screen, state: &UiState) -> Result<Self> {
+		Self::spawn_notifying(screen, state, None)
+	}
+
+	fn spawn_notifying(
+		screen: Screen,
+		state: &UiState,
+		notify: Option<UiNotification>,
+	) -> Result<Self> {
 		let mut child = Command::new(std::env::current_exe()?)
 			.args(["ui", screen.argument()])
 			.stdin(Stdio::piped())
@@ -39,6 +55,8 @@ impl UiProcess {
 			.stderr(Stdio::inherit())
 			.spawn()
 			.context("start UI process")?;
+		platform::desktop::allow_ui_foreground(child.id());
+		let pid = child.id();
 		let Some(stdin) = child.stdin.take() else {
 			let _ = child.kill();
 			let _ = child.wait();
@@ -52,6 +70,7 @@ impl UiProcess {
 		let (sender, events) = mpsc::channel();
 		let mut process = Self {
 			child,
+			language: state.settings.language,
 			stdin: Arc::new(Mutex::new(stdin)),
 			events,
 		};
@@ -67,7 +86,13 @@ impl UiProcess {
 							UiMessage::RequestInstalledApps | UiMessage::SaveSettings { .. }
 						))
 					);
-					if sender.send(message).is_err() || !keep_reading {
+					let delivered = if let Some(notify) = &notify {
+						notify(pid, message);
+						true
+					} else {
+						sender.send(message).is_ok()
+					};
+					if !delivered || !keep_reading {
 						break;
 					}
 				}
@@ -325,50 +350,6 @@ pub fn run_demo(mut settings: Settings, first_screen: Screen, single_screen: boo
 		}
 		if single_screen {
 			return Ok(());
-		}
-	}
-}
-
-/// Edits persistent preferences without starting tracking or simulated sessions.
-// shortcut: the last settings save wins; serialize editors when single-instance routing is added.
-pub fn run_settings(language: Option<why_core::i18n::Language>) -> Result<()> {
-	let path = platform::settings::settings_path()?;
-	let mut settings = platform::settings::load(&path)
-		.with_context(|| format!("load settings: {}", path.display()))?;
-	if let Some(language) = language {
-		settings.language = language;
-	}
-	let state = UiState {
-		demo: false,
-		app: TrackedApp {
-			id: why_core::APP_ID.into(),
-			name: tr(settings.language, "Зачем я здесь?").into(),
-		},
-		goal: String::new(),
-		settings,
-	};
-	let mut ui = UiProcess::spawn(Screen::Settings, &state)?;
-	let mut catalog_requested = false;
-	loop {
-		match ui.receive(None)? {
-			Event::Message(UiMessage::RequestInstalledApps) => {
-				if !catalog_requested {
-					ui.load_catalog(state.settings.language)?;
-					catalog_requested = true;
-				}
-			}
-			Event::Message(UiMessage::SaveSettings { settings }) => {
-				let result = platform::settings::save(&path, &settings);
-				if let Err(error) = &result {
-					eprintln!("save settings {}: {error}", path.display());
-				}
-				ui.send(&DaemonMessage::SettingsSaved {
-					success: result.is_ok(),
-				})?;
-			}
-			Event::Message(UiMessage::Closed) => return Ok(()),
-			Event::Message(message) => bail!("unexpected settings response: {message:?}"),
-			Event::Timeout => bail!("unexpected settings timeout"),
 		}
 	}
 }

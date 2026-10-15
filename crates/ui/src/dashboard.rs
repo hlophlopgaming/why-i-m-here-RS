@@ -288,7 +288,20 @@ pub(super) fn build(
 		language,
 		"Будет доступно после подключения платформенного бэкенда.",
 	));
-	let mut quit = button(0, 0, 0, 0, tr(language, "Выйти"));
+	let mut quit = button(
+		0,
+		0,
+		0,
+		0,
+		tr(
+			language,
+			if demo {
+				"Выйти"
+			} else {
+				"Закрыть настройки"
+			},
+		),
+	);
 	quit.set_callback(move |_| sender.send(Action::Reply(UiMessage::Closed)));
 	footer.end();
 	main.fixed(&footer, 30);

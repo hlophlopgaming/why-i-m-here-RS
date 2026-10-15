@@ -3,6 +3,8 @@ use std::io;
 use thiserror::Error;
 
 pub mod applications;
+pub mod desktop;
+pub mod instance;
 pub mod settings;
 pub mod sound;
 

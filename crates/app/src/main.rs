@@ -9,7 +9,7 @@ use why_core::{
 };
 
 const HELP: &str = "
-  why-here --show [--language ru|en]
+  why-here [--show | --background] [--language ru|en]
   why-here --demo [--language ru|en] [--show]
   why-here ui <goal|timer|reminder|settings> --demo [--language ru|en]
   why-here --help
@@ -24,6 +24,7 @@ enum Options {
 		language: Option<Language>,
 		screen: Screen,
 		single_screen: bool,
+		background: bool,
 	},
 }
 
@@ -73,6 +74,7 @@ fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Options> {
 		language,
 		screen,
 		single_screen,
+		background,
 	})
 }
 
@@ -87,7 +89,7 @@ fn run() -> Result<()> {
 				"{}",
 				tr(
 					Language::Ru,
-					"Доступны деморежим и сохранение настроек (--show). KWin, Win32 и трей пока не подключены."
+					"Доступны трей, настройки и деморежим. Отслеживание окон пока не подключено."
 				)
 			);
 		}
@@ -97,6 +99,7 @@ fn run() -> Result<()> {
 			language,
 			screen,
 			single_screen,
+			background,
 		} => {
 			if single_screen && !demo {
 				ui::run(screen)?;
@@ -109,16 +112,8 @@ fn run() -> Result<()> {
 					screen,
 					single_screen,
 				)?;
-			} else if screen == Screen::Settings {
-				daemon::run_settings(language)?;
 			} else {
-				bail!(
-					"{}",
-					tr(
-						language.unwrap_or_default(),
-						"Отслеживание пока недоступно. Запустите why-here --demo или why-here --show."
-					)
-				);
+				daemon::run(background, language)?;
 			}
 		}
 	}
@@ -149,6 +144,7 @@ mod tests {
 				language: Some(Language::En),
 				screen: Screen::Goal,
 				single_screen: false,
+				background: false,
 			}
 		);
 		assert_eq!(
@@ -158,6 +154,7 @@ mod tests {
 				language: None,
 				screen: Screen::Timer,
 				single_screen: true,
+				background: false,
 			}
 		);
 		assert_eq!(
@@ -167,6 +164,7 @@ mod tests {
 				language: None,
 				screen: Screen::Settings,
 				single_screen: false,
+				background: false,
 			}
 		);
 	}
@@ -180,6 +178,7 @@ mod tests {
 				language: None,
 				screen: Screen::Settings,
 				single_screen: false,
+				background: false,
 			}
 		);
 		assert_eq!(
@@ -189,8 +188,34 @@ mod tests {
 				language: Some(Language::Ru),
 				screen: Screen::Settings,
 				single_screen: false,
+				background: false,
 			}
 		);
+	}
+
+	#[test]
+	fn normal_start_opens_settings_and_background_stays_hidden() {
+		for args in [vec![], vec!["--show"]] {
+			let Options::Run {
+				demo,
+				background,
+				single_screen,
+				..
+			} = options(&args).unwrap()
+			else {
+				panic!("expected run options");
+			};
+			assert!(!demo && !background && !single_screen);
+		}
+		assert!(matches!(
+			options(&["--background"]).unwrap(),
+			Options::Run {
+				demo: false,
+				background: true,
+				single_screen: false,
+				..
+			}
+		));
 	}
 
 	#[test]

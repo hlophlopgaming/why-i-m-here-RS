@@ -31,10 +31,10 @@ Built in Rust with fltk-rs, targeting **KDE Plasma 6 / Wayland** and **Windows 1
 The application works locally, with no account, server or network requests.
 
 > [!IMPORTANT]
-> **Currently a working demo.** Goal entry, timers, installed-app selection and
+> **Tray, persistent preferences and demo mode are available.** Goal entry, timers, installed-app selection and
 > warning sounds work. Closing windows and terminating applications are simulated.
 > Demo settings stay in memory; other applications are left untouched.
-> The separate `--show` command opens preferences with persistent storage.
+> Normal startup opens preferences and stays in the tray; window tracking is not connected yet.
 
 ## Quick start
 
@@ -155,6 +155,9 @@ Windows application still needs runtime verification.
 
 | Command | Opens |
 | :--- | :--- |
+| `cargo run -p app` | Preferences and daemon in the tray |
+| `cargo run -p app -- --background` | Tray daemon without a window |
+| `cargo run -p app -- --show` | Preferences of the running instance |
 | `cargo run -p app -- --demo` | Goal → timer → simulated result, in Russian |
 | `cargo run -p app -- --demo --language en` | The same flow in English |
 | `cargo run -p app -- --demo --show` | Demo settings dashboard |
@@ -168,7 +171,9 @@ mode requiring initialization over stdin.
 
 `cargo run -p app -- --show` opens preferences with **Save and close**.
 Selected applications, language and future session parameters are saved. Closing
-the window or choosing **Quit** discards edits. This panel cannot start sessions yet.
+the window or choosing **Close settings** discards edits. Closing preferences
+ends only the UI process; the daemon stays in the tray. Use **Quit application**
+in the tray menu to exit. This panel cannot start sessions yet.
 `--language ru|en` overrides the stored language for this opening; it is written
 only when saving.
 
@@ -176,10 +181,14 @@ The file is `${XDG_CONFIG_HOME:-~/.config}/why-here/settings.json` on Linux and
 `%APPDATA%\WhyHere\settings.json` on Windows. A missing file uses defaults.
 A damaged file reports an error without being overwritten. Older files receive
 defaults for new fields; unknown fields are preserved. A failed save leaves the
-panel open for retry. Until single-instance routing is implemented, avoid editing
-in multiple windows at once: the last save wins.
+panel open for retry.
 
-Normal startup and `--background` **without `--demo`** are not implemented.
+`--background` keeps the tray daemon running without opening a window. A repeated
+normal launch or `--show` contacts the running daemon and presents its single
+preferences window; a repeated `--background` opens nothing. `--language` applies
+to the next window created, while an existing window keeps its language.
+Single-instance routing uses D-Bus on Linux and a named mutex/pipe on Windows.
+Linux requires a session D-Bus bus and a StatusNotifierHost, such as Plasma.
 Running the demo does not install the app or add it to autostart.
 
 </details>
@@ -188,7 +197,7 @@ Running the demo does not install the app or add it to autostart.
 
 - [x] Persist settings with backward-compatible loading.
 - [ ] Connect goal history to real sessions (demo history remains temporary).
-- [ ] Add the tray and single-instance routing.
+- [x] Add the tray and single-instance routing.
 - [ ] Connect real window tracking and blocking through KWin and Win32.
 - [ ] Implement window closing and protected process-tree termination.
 - [ ] Meet the memory budgets and validate both platforms on real desktops.
@@ -228,7 +237,7 @@ is active. The UI never manages other applications' windows or processes.
 
 ```mermaid
 flowchart LR
-    D["why-here · controller"] <-->|"stdin / stdout · JSON v4"| U["why-here ui · fltk-rs"]
+    D["why-here · controller"] <-->|"stdin / stdout · JSON v5"| U["why-here ui · fltk-rs"]
     D --> C["core · sessions"]
     D --> P["platform · clock, catalog, sound"]
 ```
@@ -243,7 +252,7 @@ flowchart LR
 
 The engine supports independent application sessions, preserves exact app IDs
 and fixes each session's end mode. Clocks use `CLOCK_BOOTTIME` on Linux and
-`QueryInterruptTime` on Windows. IPC version 4 rejects unsupported versions and
+`QueryInterruptTime` on Windows. IPC version 5 rejects unsupported versions and
 messages over 64 KiB; catalogs are streamed in small chunks.
 
 </details>

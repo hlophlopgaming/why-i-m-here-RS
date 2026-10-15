@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::settings::{Settings, TrackedApp};
 
-pub const PROTOCOL_VERSION: u16 = 4;
+pub const PROTOCOL_VERSION: u16 = 5;
 pub const MAX_MESSAGE_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -39,6 +39,7 @@ pub struct UiState {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DaemonMessage {
+	Present,
 	SettingsSaved {
 		success: bool,
 	},
