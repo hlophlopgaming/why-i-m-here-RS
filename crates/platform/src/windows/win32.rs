@@ -338,6 +338,9 @@ fn identify(
 		return None;
 	}
 	let path = String::from_utf16_lossy(&path[..size as usize]);
+	if std::env::current_exe().is_ok_and(|own| same_path(&own.to_string_lossy(), &path)) {
+		return None;
+	}
 	let name = std::path::Path::new(&path)
 		.file_name()?
 		.to_string_lossy()
