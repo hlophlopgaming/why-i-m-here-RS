@@ -41,7 +41,8 @@ The application works locally, with no account, server or network requests.
 Download Linux x86_64 and Windows x86_64 archives from [Releases](https://github.com/hlophlopgaming/why-i-m-here-RS/releases).
 Extract and run `why-here --demo --show` (Windows: `why-here.exe --demo --show`).
 The Linux build requires glibc 2.35+ and Wayland/X11, Pango/Cairo, fontconfig
-and libdecor libraries; this is a portable archive, not an installer. Windows does not need separate FLTK libraries.
+and libdecor libraries; this is a portable archive, not an installer. Windows does not need separate FLTK libraries; if `VCRUNTIME140*.dll` is missing,
+install [Visual C++ Redistributable x64](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist).
 Archive checksums are provided in the release's `SHA256SUMS` file.
 
 To run from source, install the [build prerequisites](#build):
@@ -215,7 +216,7 @@ Running the demo does not install the app or add it to autostart.
 | Platform | Verified | Still to verify |
 | :--- | :--- | :--- |
 | **KDE Plasma 6 / Wayland** | Native UI and picker, app ID, IPC, catalog selection; PipeWire playback at zero stream volume | Real window control, suspend/resume, full desktop integration |
-| **Windows 10 / 11** | Cross-compilation of `core`, `platform` and `daemon`; Windows CI configured | GUI, Start menu catalog, audible playback and real window control |
+| **Windows 10 / 11** | Cross-compilation of `core`, `platform` and `daemon`; AppsFolder catalog in Windows CI | GUI, Start menu catalog, audible playback and real window control |
 
 The fixed **8 MiB daemon / 15 MiB UI** limits have been retired. We track
 reproducible measurements and memory regressions instead. The latest release

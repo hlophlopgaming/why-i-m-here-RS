@@ -271,3 +271,9 @@ cargo test -p platform named_pipe_forwards_and_shutdown_releases_waiting_server 
 с `Get-StartApps`; повторить с кириллическими названиями. При открытии каталога
 дочерний PowerShell появляться не должен. Скорость и пик памяти измерять отдельно:
 сценарий `background.rs` каталог не открывает.
+
+Для изменений каталога/IPC/иконки прошли 31 локальный headless-тест, clippy Linux
+и Windows, проверка D-Bus-владения на отдельной шине и шесть последовательных
+проходов релизного сценария памяти. GitHub Actions для `1586c18` прошли на Ubuntu
+и Windows; нативный тест AppsFolder в Windows тоже прошёл. Проверки CI не
+подтверждают работу GUI и производительность каталога на пользовательском Windows.

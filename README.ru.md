@@ -41,7 +41,8 @@
 Готовые архивы Linux x86_64 и Windows x86_64 — в [Releases](https://github.com/hlophlopgaming/why-i-m-here-RS/releases).
 Распакуйте архив и запустите `why-here --demo --show` (Windows: `why-here.exe --demo --show`).
 Сборка Linux требует glibc 2.35+ и библиотек Wayland/X11, Pango/Cairo, fontconfig
-и libdecor; это переносимый архив, не установщик. В Windows отдельные библиотеки FLTK не нужны.
+и libdecor; это переносимый архив, не установщик. В Windows отдельные библиотеки FLTK не нужны; при ошибке отсутствия
+`VCRUNTIME140*.dll` установите [Visual C++ Redistributable x64](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist).
 Контрольные суммы архивов находятся в `SHA256SUMS` рядом с выпуском.
 
 Для запуска из исходников установите [зависимости для сборки](#сборка):
@@ -215,7 +216,7 @@ cargo build --release -p app
 | Платформа | Проверено | Ещё предстоит |
 | :--- | :--- | :--- |
 | **KDE Plasma 6 / Wayland** | Нативные окна и выбор программы, app_id, IPC, каталог; PipeWire с нулевой громкостью потока | Управление реальными окнами, сон/пробуждение, полная интеграция |
-| **Windows 10 / 11** | Кросс-компиляция `core`, `platform`, `daemon`; настроен CI Windows | Запуск GUI, каталог «Пуска», слышимость звука и управление реальными окнами |
+| **Windows 10 / 11** | Кросс-компиляция `core`, `platform`, `daemon`; каталог AppsFolder в Windows CI | Запуск GUI, каталог «Пуска», слышимость звука и управление реальными окнами |
 
 Жёсткие лимиты **8 МиБ для демона / 15 МиБ для UI** сняты: ориентир —
 воспроизводимые измерения и отсутствие регрессий.
