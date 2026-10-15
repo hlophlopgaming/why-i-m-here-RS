@@ -1,0 +1,15 @@
+[package]
+name = "app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "why-here"
+path = "src/main.rs"
+
+[dependencies]
+why_core.workspace = true
+daemon.workspace = true
+ui.workspace = true
+anyhow.workspace = true

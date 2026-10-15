@@ -1,0 +1,23 @@
+[workspace]
+members = ["crates/core", "crates/platform", "crates/daemon", "crates/ui", "crates/app"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+why_core = { package = "core", path = "crates/core" }
+platform = { path = "crates/platform" }
+daemon = { path = "crates/daemon" }
+ui = { path = "crates/ui" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
