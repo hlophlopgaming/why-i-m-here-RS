@@ -34,6 +34,7 @@ The application works locally, with no account, server or network requests.
 > **Currently a working demo.** Goal entry, timers, installed-app selection and
 > warning sounds work. Closing windows and terminating applications are simulated.
 > Demo settings stay in memory; other applications are left untouched.
+> The separate `--show` command opens preferences with persistent storage.
 
 ## Quick start
 
@@ -112,6 +113,12 @@ sudo apt install build-essential cmake pkg-config libwayland-dev wayland-protoco
   libxrender-dev libxfixes-dev
 ```
 
+On Arch Linux / EndeavourOS, install the build tools and protocol files:
+
+```bash
+sudo pacman -S --needed base-devel cmake pkgconf wayland wayland-protocols libxkbcommon dbus pango cairo libx11 libxext libxft libxinerama libxcursor libxrender libxfixes
+```
+
 For sound, also install the PipeWire tools providing `pw-play` (`pipewire-bin`
 on Debian/Ubuntu).
 
@@ -159,14 +166,28 @@ The timer preview exits on expiry or **End session now**. `--help` lists command
 `--version` prints the workspace version. Without `--demo`, `ui` is an internal
 mode requiring initialization over stdin.
 
-Normal startup, `--show` and `--background` **without `--demo`** are not implemented.
+`cargo run -p app -- --show` opens preferences with **Save and close**.
+Selected applications, language and future session parameters are saved. Closing
+the window or choosing **Quit** discards edits. This panel cannot start sessions yet.
+`--language ru|en` overrides the stored language for this opening; it is written
+only when saving.
+
+The file is `${XDG_CONFIG_HOME:-~/.config}/why-here/settings.json` on Linux and
+`%APPDATA%\WhyHere\settings.json` on Windows. A missing file uses defaults.
+A damaged file reports an error without being overwritten. Older files receive
+defaults for new fields; unknown fields are preserved. A failed save leaves the
+panel open for retry. Until single-instance routing is implemented, avoid editing
+in multiple windows at once: the last save wins.
+
+Normal startup and `--background` **without `--demo`** are not implemented.
 Running the demo does not install the app or add it to autostart.
 
 </details>
 
 ## Roadmap
 
-- [ ] Persist settings and goal history, with backward-compatible loading.
+- [x] Persist settings with backward-compatible loading.
+- [ ] Connect goal history to real sessions (demo history remains temporary).
 - [ ] Add the tray and single-instance routing.
 - [ ] Connect real window tracking and blocking through KWin and Win32.
 - [ ] Implement window closing and protected process-tree termination.
@@ -207,7 +228,7 @@ is active. The UI never manages other applications' windows or processes.
 
 ```mermaid
 flowchart LR
-    D["why-here · controller"] <-->|"stdin / stdout · JSON v3"| U["why-here ui · fltk-rs"]
+    D["why-here · controller"] <-->|"stdin / stdout · JSON v4"| U["why-here ui · fltk-rs"]
     D --> C["core · sessions"]
     D --> P["platform · clock, catalog, sound"]
 ```
@@ -222,7 +243,7 @@ flowchart LR
 
 The engine supports independent application sessions, preserves exact app IDs
 and fixes each session's end mode. Clocks use `CLOCK_BOOTTIME` on Linux and
-`QueryInterruptTime` on Windows. IPC version 3 rejects unsupported versions and
+`QueryInterruptTime` on Windows. IPC version 4 rejects unsupported versions and
 messages over 64 KiB; catalogs are streamed in small chunks.
 
 </details>

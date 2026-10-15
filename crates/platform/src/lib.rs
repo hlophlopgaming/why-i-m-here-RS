@@ -3,6 +3,7 @@ use std::io;
 use thiserror::Error;
 
 pub mod applications;
+pub mod settings;
 pub mod sound;
 
 #[derive(Debug, Error)]

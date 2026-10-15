@@ -61,8 +61,12 @@ impl UiProcess {
 				let mut reader = BufReader::new(stdout);
 				loop {
 					let message = ipc::read_message(&mut reader);
-					let keep_reading =
-						matches!(&message, Ok(Some(UiMessage::RequestInstalledApps)));
+					let keep_reading = matches!(
+						&message,
+						Ok(Some(
+							UiMessage::RequestInstalledApps | UiMessage::SaveSettings { .. }
+						))
+					);
 					if sender.send(message).is_err() || !keep_reading {
 						break;
 					}
@@ -224,6 +228,7 @@ pub fn run_demo(mut settings: Settings, first_screen: Screen, single_screen: boo
 		});
 	}
 	let mut state = UiState {
+		demo: true,
 		app: settings.tracked_apps[0].clone(),
 		goal: if matches!(screen, Screen::Timer | Screen::Reminder) {
 			tr(settings.language, "Прочитать документацию").into()
@@ -320,6 +325,50 @@ pub fn run_demo(mut settings: Settings, first_screen: Screen, single_screen: boo
 		}
 		if single_screen {
 			return Ok(());
+		}
+	}
+}
+
+/// Edits persistent preferences without starting tracking or simulated sessions.
+// shortcut: the last settings save wins; serialize editors when single-instance routing is added.
+pub fn run_settings(language: Option<why_core::i18n::Language>) -> Result<()> {
+	let path = platform::settings::settings_path()?;
+	let mut settings = platform::settings::load(&path)
+		.with_context(|| format!("load settings: {}", path.display()))?;
+	if let Some(language) = language {
+		settings.language = language;
+	}
+	let state = UiState {
+		demo: false,
+		app: TrackedApp {
+			id: why_core::APP_ID.into(),
+			name: tr(settings.language, "Зачем я здесь?").into(),
+		},
+		goal: String::new(),
+		settings,
+	};
+	let mut ui = UiProcess::spawn(Screen::Settings, &state)?;
+	let mut catalog_requested = false;
+	loop {
+		match ui.receive(None)? {
+			Event::Message(UiMessage::RequestInstalledApps) => {
+				if !catalog_requested {
+					ui.load_catalog(state.settings.language)?;
+					catalog_requested = true;
+				}
+			}
+			Event::Message(UiMessage::SaveSettings { settings }) => {
+				let result = platform::settings::save(&path, &settings);
+				if let Err(error) = &result {
+					eprintln!("save settings {}: {error}", path.display());
+				}
+				ui.send(&DaemonMessage::SettingsSaved {
+					success: result.is_ok(),
+				})?;
+			}
+			Event::Message(UiMessage::Closed) => return Ok(()),
+			Event::Message(message) => bail!("unexpected settings response: {message:?}"),
+			Event::Timeout => bail!("unexpected settings timeout"),
 		}
 	}
 }

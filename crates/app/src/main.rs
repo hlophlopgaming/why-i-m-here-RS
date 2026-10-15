@@ -9,6 +9,7 @@ use why_core::{
 };
 
 const HELP: &str = "
+  why-here --show [--language ru|en]
   why-here --demo [--language ru|en] [--show]
   why-here ui <goal|timer|reminder|settings> --demo [--language ru|en]
   why-here --help
@@ -20,7 +21,7 @@ enum Options {
 	Version,
 	Run {
 		demo: bool,
-		language: Language,
+		language: Option<Language>,
 		screen: Screen,
 		single_screen: bool,
 	},
@@ -29,7 +30,7 @@ enum Options {
 fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Options> {
 	let mut args = arguments.into_iter().peekable();
 	let mut demo = false;
-	let mut language = Language::Ru;
+	let mut language = None;
 	let mut screen = Screen::Goal;
 	let mut single_screen = false;
 	let mut show = false;
@@ -42,11 +43,11 @@ fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Options> {
 			"--show" => show = true,
 			"--background" => background = true,
 			"--language" => {
-				language = match args.next().as_deref() {
+				language = Some(match args.next().as_deref() {
 					Some("ru") => Language::Ru,
 					Some("en") => Language::En,
 					_ => bail!("--language requires ru or en"),
-				}
+				})
 			}
 			"ui" if !single_screen => {
 				single_screen = true;
@@ -86,7 +87,7 @@ fn run() -> Result<()> {
 				"{}",
 				tr(
 					Language::Ru,
-					"Доступен деморежим. KWin, Win32 и трей пока не подключены."
+					"Доступны деморежим и сохранение настроек (--show). KWin, Win32 и трей пока не подключены."
 				)
 			);
 		}
@@ -102,18 +103,20 @@ fn run() -> Result<()> {
 			} else if demo {
 				daemon::run_demo(
 					Settings {
-						language,
+						language: language.unwrap_or_default(),
 						..Settings::default()
 					},
 					screen,
 					single_screen,
 				)?;
+			} else if screen == Screen::Settings {
+				daemon::run_settings(language)?;
 			} else {
 				bail!(
 					"{}",
 					tr(
-						language,
-						"Пока доступен только деморежим. Запустите why-here --demo."
+						language.unwrap_or_default(),
+						"Отслеживание пока недоступно. Запустите why-here --demo или why-here --show."
 					)
 				);
 			}
@@ -143,7 +146,7 @@ mod tests {
 			options(&["--demo", "--language", "en"]).unwrap(),
 			Options::Run {
 				demo: true,
-				language: Language::En,
+				language: Some(Language::En),
 				screen: Screen::Goal,
 				single_screen: false,
 			}
@@ -152,7 +155,7 @@ mod tests {
 			options(&["ui", "timer", "--demo"]).unwrap(),
 			Options::Run {
 				demo: true,
-				language: Language::Ru,
+				language: None,
 				screen: Screen::Timer,
 				single_screen: true,
 			}
@@ -161,7 +164,29 @@ mod tests {
 			options(&["--demo", "--show"]).unwrap(),
 			Options::Run {
 				demo: true,
-				language: Language::Ru,
+				language: None,
+				screen: Screen::Settings,
+				single_screen: false,
+			}
+		);
+	}
+
+	#[test]
+	fn persistent_settings_keep_saved_language_unless_explicitly_overridden() {
+		assert_eq!(
+			options(&["--show"]).unwrap(),
+			Options::Run {
+				demo: false,
+				language: None,
+				screen: Screen::Settings,
+				single_screen: false,
+			}
+		);
+		assert_eq!(
+			options(&["--show", "--language", "ru"]).unwrap(),
+			Options::Run {
+				demo: false,
+				language: Some(Language::Ru),
 				screen: Screen::Settings,
 				single_screen: false,
 			}

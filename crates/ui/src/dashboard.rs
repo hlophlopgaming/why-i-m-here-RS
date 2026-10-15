@@ -29,9 +29,16 @@ pub(super) struct Dashboard {
 	open: Button,
 	status: fltk::frame::Frame,
 	language: Language,
+	demo: bool,
 }
 
 impl Dashboard {
+	pub fn save_failed(&mut self) {
+		self.status.set_label(tr(
+			self.language,
+			"Не удалось сохранить настройки. Проверьте права и свободное место; повторите попытку.",
+		));
+	}
 	pub fn add_app(&mut self, app: TrackedApp) {
 		let existing = self.apps.borrow().iter().position(|old| old.id == app.id);
 		if let Some(index) = existing {
@@ -45,7 +52,7 @@ impl Dashboard {
 			self.apps.borrow_mut().push(app);
 			self.list.select(self.list.size());
 		}
-		update_open(&self.tracking, &self.list, &mut self.open);
+		update_open(&self.tracking, &self.list, &mut self.open, self.demo);
 	}
 }
 
@@ -58,8 +65,8 @@ fn field(main: &mut Flex, caption: &str) -> Flex {
 	row
 }
 
-fn update_open(tracking: &CheckButton, apps: &HoldBrowser, open: &mut Button) {
-	if tracking.value() && apps.value() > 0 {
+fn update_open(tracking: &CheckButton, apps: &HoldBrowser, open: &mut Button, demo: bool) {
+	if !demo || (tracking.value() && apps.value() > 0) {
 		open.activate();
 	} else {
 		open.deactivate();
@@ -72,6 +79,7 @@ pub(super) fn build(
 	window: &mut Window,
 ) -> Dashboard {
 	let language = state.settings.language;
+	let demo = state.demo;
 	let mut main = Flex::default_fill().column();
 	main.set_margin(12);
 	main.set_pad(4);
@@ -111,7 +119,14 @@ pub(super) fn build(
 		0,
 		0,
 		0,
-		tr(language, "Деморежим · KWin / Win32 не подключены"),
+		tr(
+			language,
+			if demo {
+				"Деморежим · KWin / Win32 не подключены"
+			} else {
+				"Настройки сохраняются · KWin / Win32 не подключены"
+			},
+		),
 	);
 	connection.set_label_color(theme::WARNING);
 	main.fixed(&connection, 20);
@@ -123,7 +138,14 @@ pub(super) fn build(
 		0,
 		0,
 		0,
-		tr(language, "Отслеживаемые программы (демосессии)"),
+		tr(
+			language,
+			if demo {
+				"Отслеживаемые программы (демосессии)"
+			} else {
+				"Выбранные программы (отслеживание пока недоступно)"
+			},
+		),
 	);
 	main.fixed(&label, 20);
 	let apps = Rc::new(RefCell::new(state.settings.tracked_apps.clone()));
@@ -142,6 +164,10 @@ pub(super) fn build(
 	let mut toolbar = Flex::default().row();
 	toolbar.set_pad(8);
 	let mut add = button(0, 0, 0, 0, tr(language, "Добавить демопрограмму…"));
+	if !demo {
+		add.deactivate();
+		add.set_tooltip(tr(language, "Демопрограммы доступны только с --demo."));
+	}
 	let mut installed = button(0, 0, 0, 0, tr(language, "Из установленных программ…"));
 	installed.set_callback(move |_| sender.send(Action::OpenPicker));
 	let mut remove = button(0, 0, 0, 0, tr(language, "Удалить"));
@@ -184,7 +210,20 @@ pub(super) fn build(
 		0
 	});
 	mode_row.end();
-	let mut caution = text(0, 0, 0, 0, tr(language, "Принудительное завершение может потерять несохранённые данные.\nВ деморежиме действие только имитируется."));
+	let mut caution = text(
+		0,
+		0,
+		0,
+		0,
+		tr(
+			language,
+			if demo {
+				"Принудительное завершение может потерять несохранённые данные.\nВ деморежиме действие только имитируется."
+			} else {
+				"Настройки не запускают сессии и не закрывают программы."
+			},
+		),
+	);
 	caution.set_label_color(theme::MUTED);
 	main.fixed(&caution, 38);
 	let mut autostart =
@@ -217,7 +256,11 @@ pub(super) fn build(
 		0,
 		tr(
 			language,
-			"Активных сессий нет. Выберите программу и откройте форму цели.",
+			if demo {
+				"Активных сессий нет. Выберите программу и откройте форму цели."
+			} else {
+				"Настройки не запускают сессии и не закрывают программы."
+			},
 		),
 	);
 	sessions.set_frame(FrameType::FlatBox);
@@ -225,7 +268,20 @@ pub(super) fn build(
 	sessions.set_label_color(theme::MUTED);
 	let mut footer = Flex::default().row();
 	footer.set_pad(8);
-	let mut open = button(0, 0, 0, 0, tr(language, "Открыть форму цели"));
+	let mut open = button(
+		0,
+		0,
+		0,
+		0,
+		tr(
+			language,
+			if demo {
+				"Открыть форму цели"
+			} else {
+				"Сохранить и закрыть"
+			},
+		),
+	);
 	let mut reconnect = button(0, 0, 0, 0, tr(language, "Переподключить KWin / Win32"));
 	reconnect.deactivate();
 	reconnect.set_tooltip(tr(
@@ -243,14 +299,15 @@ pub(super) fn build(
 	main.end();
 	window.resizable(&main);
 	window.size_range(760, 740, 0, 0);
-	update_open(&tracking, &list, &mut open);
+	update_open(&tracking, &list, &mut open, demo);
 	let mut list_open = open.clone();
 	let list_tracking = tracking.clone();
-	list.set_callback(move |list| update_open(&list_tracking, list, &mut list_open));
+	list.set_callback(move |list| update_open(&list_tracking, list, &mut list_open, demo));
 	let tracking_list = list.clone();
 	let mut tracking_open = open.clone();
-	tracking
-		.set_callback(move |tracking| update_open(tracking, &tracking_list, &mut tracking_open));
+	tracking.set_callback(move |tracking| {
+		update_open(tracking, &tracking_list, &mut tracking_open, demo)
+	});
 	let remove_apps = apps.clone();
 	let mut remove_list = list.clone();
 	let remove_tracking = tracking.clone();
@@ -264,7 +321,7 @@ pub(super) fn build(
 				remove_list.select(index.min(remove_list.size()));
 			}
 		}
-		update_open(&remove_tracking, &remove_list, &mut remove_open);
+		update_open(&remove_tracking, &remove_list, &mut remove_open, demo);
 	});
 	let add_apps = apps.clone();
 	let mut add_list = list.clone();
@@ -288,7 +345,7 @@ pub(super) fn build(
 			add_list.add(&format!("{name} — {id}"));
 			add_list.select(add_list.size());
 		}
-		update_open(&add_tracking, &add_list, &mut add_open);
+		update_open(&add_tracking, &add_list, &mut add_open, demo);
 	});
 	let dashboard = Dashboard {
 		apps: apps.clone(),
@@ -297,6 +354,7 @@ pub(super) fn build(
 		open: open.clone(),
 		status: connection.clone(),
 		language,
+		demo,
 	};
 	let mut settings = state.settings.clone();
 	open.set_callback(move |_| {
@@ -308,15 +366,6 @@ pub(super) fn build(
 			connection.set_label(tr(language, "Интервал предупреждения: от 0 до 1440 минут."));
 			return;
 		};
-		let Some(app) = usize::try_from(list.value() - 1)
-			.ok()
-			.and_then(|index| apps.borrow().get(index).cloned())
-		else {
-			return;
-		};
-		if !tracking.value() {
-			return;
-		}
 		settings.duration_secs = duration_secs;
 		settings.warning_secs = warning_secs;
 		settings.play_sound = sound.value();
@@ -332,10 +381,73 @@ pub(super) fn build(
 		};
 		settings.tracking_enabled = tracking.value();
 		settings.tracked_apps = apps.borrow().clone();
+		if !demo {
+			sender.send(Action::Reply(UiMessage::SaveSettings {
+				settings: settings.clone(),
+			}));
+			return;
+		}
+		let Some(app) = usize::try_from(list.value() - 1)
+			.ok()
+			.and_then(|index| apps.borrow().get(index).cloned())
+		else {
+			return;
+		};
+		if !tracking.value() {
+			return;
+		}
 		sender.send(Action::Reply(UiMessage::StartSession {
 			settings: settings.clone(),
 			app_id: app.id,
 		}));
 	});
 	dashboard
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	#[ignore = "requires a graphical desktop; opens only the application's settings"]
+	fn native_settings_save_without_apps_or_tracking_and_allow_retry() {
+		let _application = fltk::app::App::default();
+		theme::apply();
+		let (sender, receiver) = fltk::app::channel::<Action>();
+		let state = UiState {
+			demo: false,
+			app: TrackedApp {
+				id: why_core::APP_ID.into(),
+				name: "Settings".into(),
+			},
+			goal: String::new(),
+			settings: why_core::settings::Settings {
+				tracking_enabled: false,
+				language: Language::En,
+				..Default::default()
+			},
+		};
+		let mut window = Window::new(0, 0, 820, 780, "Settings test");
+		window.set_xclass(why_core::APP_ID);
+		let mut dashboard = build(&state, sender, &mut window);
+		window.end();
+		window.show();
+		fltk::app::wait_for(0.1).unwrap();
+		assert!(dashboard.open.active());
+		assert_eq!(dashboard.open.label(), "Save and close");
+		dashboard.open.do_callback();
+		let Some(Action::Reply(UiMessage::SaveSettings { settings })) = receiver.recv() else {
+			panic!("missing save request");
+		};
+		assert_eq!(settings, state.settings);
+		dashboard.save_failed();
+		assert!(window.shown());
+		assert!(dashboard.status.label().contains("Unable to save"));
+		dashboard.open.do_callback();
+		assert!(matches!(
+			receiver.recv(),
+			Some(Action::Reply(UiMessage::SaveSettings { .. }))
+		));
+		window.hide();
+	}
 }

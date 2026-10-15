@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::settings::{Settings, TrackedApp};
 
-pub const PROTOCOL_VERSION: u16 = 3;
+pub const PROTOCOL_VERSION: u16 = 4;
 pub const MAX_MESSAGE_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -30,6 +30,7 @@ impl Screen {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UiState {
+	pub demo: bool,
 	pub app: TrackedApp,
 	pub goal: String,
 	pub settings: Settings,
@@ -38,6 +39,9 @@ pub struct UiState {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DaemonMessage {
+	SettingsSaved {
+		success: bool,
+	},
 	Init {
 		screen: Screen,
 		state: UiState,
@@ -56,6 +60,7 @@ pub enum DaemonMessage {
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UiMessage {
+	SaveSettings { settings: Settings },
 	RequestInstalledApps,
 	GoalSubmitted { goal: String, duration_secs: u32 },
 	GoalCancelled,
@@ -158,6 +163,26 @@ mod tests {
 			read_message::<UiMessage>(&mut bytes.as_slice()),
 			Err(IpcError::Framing)
 		));
+	}
+
+	#[test]
+	fn persistent_settings_save_and_acknowledgement_round_trip() {
+		let message = UiMessage::SaveSettings {
+			settings: Settings::default(),
+		};
+		let mut bytes = Vec::new();
+		write_message(&mut bytes, &message).unwrap();
+		assert_eq!(
+			read_message::<UiMessage>(&mut bytes.as_slice()).unwrap(),
+			Some(message)
+		);
+		for success in [false, true] {
+			let mut bytes = Vec::new();
+			write_message(&mut bytes, &DaemonMessage::SettingsSaved { success }).unwrap();
+			assert!(
+				matches!(read_message::<DaemonMessage>(&mut bytes.as_slice()).unwrap(), Some(DaemonMessage::SettingsSaved { success: actual }) if actual == success)
+			);
+		}
 	}
 
 	#[test]

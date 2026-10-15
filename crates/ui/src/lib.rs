@@ -44,6 +44,7 @@ enum Action {
 	InstalledApps(Vec<TrackedApp>, bool, bool),
 	Reply(UiMessage),
 	Tick(u64, bool),
+	SettingsSaved(bool),
 	Disconnected,
 }
 
@@ -86,6 +87,7 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 	};
 	if requested != screen
 		|| state.settings.validate().is_err()
+		|| (!state.demo && screen != Screen::Settings)
 		|| !state.app.is_valid()
 		|| state.goal.chars().count() > 1024
 	{
@@ -98,6 +100,9 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 		.name("daemon-ipc".into())
 		.spawn(move || loop {
 			match ipc::read_message::<DaemonMessage>(&mut reader) {
+				Ok(Some(DaemonMessage::SettingsSaved { success })) => {
+					sender.send(Action::SettingsSaved(success))
+				}
 				Ok(Some(DaemonMessage::Tick {
 					remaining_secs,
 					warning,
@@ -177,6 +182,18 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 					if let Some(picker) = picker.as_mut() {
 						picker.receive(apps, complete, error);
 					}
+				}
+				Action::SettingsSaved(success) => {
+					if success && !state.demo && screen == Screen::Settings {
+						ipc::write_message(&mut io::stdout().lock(), &UiMessage::Closed)?;
+						window.hide();
+						return Ok(());
+					} else if let Some(dashboard) = dashboard.as_mut() {
+						dashboard.save_failed();
+					}
+				}
+				Action::Reply(message @ UiMessage::SaveSettings { .. }) => {
+					ipc::write_message(&mut io::stdout().lock(), &message)?;
 				}
 				Action::Reply(message) => {
 					ipc::write_message(&mut io::stdout().lock(), &message)?;

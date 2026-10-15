@@ -102,6 +102,15 @@ pub fn tr(language: Language, source: &'static str) -> &'static str {
 		"Не удалось загрузить список. Закройте настройки и повторите попытку." => "Unable to load apps. Close settings and try again.",
 		"Установленные программы не найдены." => "No installed applications found.",
 		"Выберите программу из списка." => "Select an application from the list.",
+		"Настройки сохраняются · KWin / Win32 не подключены" => "Settings are saved · KWin / Win32 not connected",
+		"Выбранные программы (отслеживание пока недоступно)" => "Selected applications (tracking not yet available)",
+		"Демопрограммы доступны только с --demo." => "Demo applications are only available with --demo.",
+		"Настройки не запускают сессии и не закрывают программы." => "Settings do not start sessions or close applications.",
+		"Сохранить и закрыть" => "Save and close",
+		"Не удалось сохранить настройки. Проверьте права и свободное место; повторите попытку." => "Unable to save settings. Check permissions and free space, then retry.",
+		"Выбор добавит программу в список. Она не будет запущена или завершена." => "Selection adds the app to the list. It will not be launched or terminated.",
+		"Доступны деморежим и сохранение настроек (--show). KWin, Win32 и трей пока не подключены." => "Demo mode and saved settings (--show) are available. KWin, Win32 and tray are not connected yet.",
+		"Отслеживание пока недоступно. Запустите why-here --demo или why-here --show." => "Tracking is not available yet. Run why-here --demo or why-here --show.",
 		_ => source,
 	}
 }
