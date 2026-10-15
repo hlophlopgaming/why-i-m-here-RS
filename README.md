@@ -210,10 +210,13 @@ Running the demo does not install the app or add it to autostart.
 | **KDE Plasma 6 / Wayland** | Native UI and picker, app ID, IPC, catalog selection; PipeWire playback at zero stream volume | Real window control, suspend/resume, full desktop integration |
 | **Windows 10 / 11** | Cross-compilation of `core`, `platform` and `daemon`; Windows CI configured | GUI, Start menu catalog, audible playback and real window control |
 
-The **8 MiB daemon / 15 MiB UI** memory targets are not yet met. An earlier native
-Wayland release measurement showed approximately **8.9 / 26.5 MiB** respectively;
-RSS has not been remeasured after the latest UI work. See [TESTING.md](TESTING.md)
-for measurements, validation limits and manual checks.
+The **8 MiB daemon / 15 MiB UI** targets are not met yet. The latest release
+optimization reduced daemon RSS by approximately **7–9%** and binary size by
+**30%**. On the measured Linux desktop, the background daemon uses about
+**10.6 MiB RSS** and preferences about **30 MiB**. These are point-in-time Linux
+samples; Windows and other screens need separate measurements.
+See [BENCHMARKS.md](BENCHMARKS.md) for methodology and comparisons, and
+[TESTING.md](TESTING.md) for manual checks.
 
 ## Development
 
