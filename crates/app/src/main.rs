@@ -121,7 +121,25 @@ fn run() -> Result<()> {
 	Ok(())
 }
 
+#[cfg(target_os = "linux")]
+fn linux_ui_backend(desktop: &str) -> &'static str {
+	if desktop
+		.split(':')
+		.any(|name| name.eq_ignore_ascii_case("KDE"))
+	{
+		"wayland"
+	} else {
+		"x11"
+	}
+}
+
 fn main() {
+	#[cfg(target_os = "linux")]
+	{
+		// Choose before starting threads; every UI child inherits the same backend.
+		let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
+		std::env::set_var("FLTK_BACKEND", linux_ui_backend(&desktop));
+	}
 	if let Err(error) = run() {
 		eprintln!("{error:#}");
 		std::process::exit(1);
@@ -134,6 +152,17 @@ mod tests {
 
 	fn options(args: &[&str]) -> Result<Options> {
 		parse(args.iter().map(|arg| (*arg).to_owned()))
+	}
+
+	#[cfg(target_os = "linux")]
+	#[test]
+	fn linux_backend_uses_wayland_only_for_kde() {
+		for desktop in ["KDE", "kde", "KDE:Plasma", "Something:KDE"] {
+			assert_eq!(linux_ui_backend(desktop), "wayland");
+		}
+		for desktop in ["", "GNOME", "ubuntu:GNOME", "XFCE", "sway", "NotKDE"] {
+			assert_eq!(linux_ui_backend(desktop), "x11");
+		}
 	}
 
 	#[test]

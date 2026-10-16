@@ -16,7 +16,9 @@ function run() {
 	const a=window('one','fixture'), b=window('two','fixture');
 	const other=window('other','unselected');
 	const own=window('ui','org.local.WhyHere',3);own.caption='Why am I here? — Fixture';
-	const workspace={windowAdded:signal(),windowRemoved:signal(),windowActivated:signal(),windowList:()=>[a,b,other,own]};
+	const timer=window('timer','org.local.WhyHere',4);timer.caption='Таймер';
+	const unrelated=window('unrelated','unselected');unrelated.caption='Timer';
+	const workspace={windowAdded:signal(),windowRemoved:signal(),windowActivated:signal(),windowList:()=>[a,b,other,own,timer,unrelated]};
 	let reply={blocked:['desktop:fixture.desktop'],close:[],focus:{"desktop:fixture.desktop":3},running:true,watch:true};
 	const snapshots=[];
 	const source=fs.readFileSync(__dirname+'/bridge.js','utf8').replace('__WHY_HERE_CONFIG__',JSON.stringify({pid:1,service:'test',blocked:reply.blocked,apps:[{id:reply.blocked[0],desktop:'fixture',file:'fixture.desktop'}]}));
@@ -26,6 +28,9 @@ function run() {
 	}});
 	assert.equal(a.minimized,true);assert.equal(b.minimized,true);assert.equal(other.minimized,false);
 	assert.equal(snapshots[0].length,2);
+	assert.equal(timer.keepAbove,true);assert.equal(own.keepAbove,undefined);assert.equal(unrelated.keepAbove,undefined);
+	const english=window('english','org.local.WhyHere',5);english.caption='Timer';
+	workspace.windowAdded.emit(english);assert.equal(english.keepAbove,true);
 	a.minimized=false;assert.equal(a.minimized,true);assert.equal(workspace.activeWindow,own);
 	workspace.activeWindow=other;workspace.windowActivated.emit(other);assert.equal(workspace.activeWindow,other);
 	reply={...reply,blocked:[]};timers[0].timeout.emit();assert.equal(a.minimized,false);assert.equal(b.minimized,false);

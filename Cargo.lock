@@ -16,7 +16,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "app"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "core",
@@ -245,7 +245,7 @@ dependencies = [
 
 [[package]]
 name = "core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -278,7 +278,7 @@ checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
 name = "daemon"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "core",
@@ -752,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "platform"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "core",
  "libc",
@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "ui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "core",
  "fltk",

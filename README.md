@@ -31,7 +31,7 @@ Built in Rust with fltk-rs, targeting **KDE Plasma 6 / Wayland** and **Windows 1
 The application works locally, with no account, server or network requests.
 
 > [!IMPORTANT]
-> **Release v0.2.0 supports real sessions, the tray, settings and autostart.**
+> **Release v0.2.1 supports real sessions, the tray, settings and autostart.**
 > Selected applications are minimized behind the goal/time question. Answering shows
 > the application and its timer. Closing the question, timer expiry or **Finish session**
 > sends a normal close request to all application windows; the app can offer to save documents.
@@ -79,7 +79,7 @@ cargo run --release -p app -- --demo --show --language en
 | 🎯 **Set an intention** | Enter a goal before the timer starts. Start stays disabled until the goal is valid. |
 | ⏱ **Choose your time** | Use 5 / 15 / 30 minute presets or set 1–1440 minutes. |
 | 🗂 **Pick an application** | Search installed apps by name or ID; add and remove apps in the demo list. Nothing is launched. |
-| 🪟 **Keep the goal nearby** | A small, draggable, borderless panel shows the app, goal, remaining time and end mode. |
+| 🪟 **Keep the goal nearby** | A small, draggable, borderless panel stays above ordinary windows and shows the app, goal, remaining time and end mode. |
 | 🔔 **Get a warning** | The countdown turns amber near the deadline. Enable one warning sound per session if you want it. |
 | 🌐 **Use either language** | Russian and English; the dashboard's language choice applies to the next UI process. |
 | 🔒 **Keep it local** | No accounts, telemetry or app network requests. Demo settings and goal history disappear on exit. |
@@ -293,3 +293,17 @@ messages over 64 KiB; catalogs are streamed in small chunks.
 ---
 
 <p align="center">Made with Rust and fltk-rs · <a href="LICENSE">MIT License</a></p>
+
+### Linux window backend selection
+
+At startup the app checks `XDG_CURRENT_DESKTOP`: KDE uses native Wayland,
+while other desktops use X11 (through XWayland in a Wayland session).
+This applies to every UI process, including demos, and overrides an external
+`FLTK_BACKEND` value. Outside KDE, X11/XWayland and `DISPLAY` must be available.
+The timer panel uses KWin's `keepAbove` on KDE and FLTK's native request on
+X11 and Windows. Visibility above an active fullscreen window is not guaranteed.
+KDE demos do not start the KWin script, so their panel is not kept above windows.
+Selecting X11 does not add window tracking for GNOME or other desktops: real
+window tracking on Linux still requires KWin.
+
+Settings show a warning when running through X11 within a Wayland session: native Wayland application tracking is unavailable without KWin integration; the interface and demo mode still work.

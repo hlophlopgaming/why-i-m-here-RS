@@ -158,6 +158,9 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 	};
 	window.end();
 	window.show();
+	if screen == Screen::Timer {
+		window.set_on_top();
+	}
 	while application.wait() {
 		while let Some(action) = receiver.recv() {
 			match action {

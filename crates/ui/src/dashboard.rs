@@ -73,6 +73,11 @@ fn update_open(tracking: &CheckButton, apps: &HoldBrowser, open: &mut Button, de
 	}
 }
 
+#[cfg(any(target_os = "linux", test))]
+fn x11_in_wayland(using_x11: bool, session_type: &str, has_wayland_display: bool) -> bool {
+	using_x11 && (session_type.eq_ignore_ascii_case("wayland") || has_wayland_display)
+}
+
 pub(super) fn build(
 	state: &UiState,
 	sender: fltk::app::Sender<Action>,
@@ -80,6 +85,17 @@ pub(super) fn build(
 ) -> Dashboard {
 	let language = state.settings.language;
 	let demo = state.demo;
+	#[cfg(target_os = "linux")]
+	let warn_xwayland = x11_in_wayland(
+		std::env::var("FLTK_BACKEND").is_ok_and(|backend| backend == "x11"),
+		&std::env::var("XDG_SESSION_TYPE").unwrap_or_default(),
+		std::env::var_os("WAYLAND_DISPLAY").is_some_and(|value| !value.is_empty()),
+	);
+	#[cfg(not(target_os = "linux"))]
+	let warn_xwayland = false;
+	if warn_xwayland {
+		window.resize(window.x(), window.y(), window.w(), window.h() + 64);
+	}
 	let mut main = Flex::default_fill().column();
 	main.set_margin(12);
 	main.set_pad(4);
@@ -140,6 +156,14 @@ pub(super) fn build(
 	);
 	connection.set_label_color(theme::WARNING);
 	main.fixed(&connection, 20);
+	if warn_xwayland {
+		let mut warning = text(
+			0, 0, 0, 0,
+			tr(language, "Приложение запущено через X11 в сеансе Wayland. Без интеграции с KWin отслеживание нативных Wayland-приложений недоступно. Интерфейс и деморежим работают."),
+		);
+		warning.set_label_color(theme::WARNING);
+		main.fixed(&warning, 60);
+	}
 	let mut tracking = CheckButton::default().with_label(tr(language, "Отслеживание включено"));
 	tracking.set_value(state.settings.tracking_enabled);
 	main.fixed(&tracking, 24);
@@ -443,6 +467,15 @@ pub(super) fn build(
 
 #[cfg(test)]
 mod tests {
+	#[test]
+	fn xwayland_warning_requires_x11_and_a_wayland_session() {
+		assert!(super::x11_in_wayland(true, "wayland", false));
+		assert!(super::x11_in_wayland(true, "", true));
+		assert!(!super::x11_in_wayland(false, "wayland", true));
+		assert!(!super::x11_in_wayland(true, "x11", false));
+		assert!(!super::x11_in_wayland(true, "", false));
+	}
+
 	use super::*;
 
 	#[test]

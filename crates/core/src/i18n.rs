@@ -13,6 +13,7 @@ pub fn tr(language: Language, source: &'static str) -> &'static str {
 		return source;
 	}
 	match source {
+		"Приложение запущено через X11 в сеансе Wayland. Без интеграции с KWin отслеживание нативных Wayland-приложений недоступно. Интерфейс и деморежим работают." => "The app is running through X11 in a Wayland session. Native Wayland application tracking is unavailable without KWin integration. The interface and demo mode still work.",
 		"Автозапуск недоступен в деморежиме." => "Autostart is unavailable in demo mode.",
 		"Применяется при сохранении. Запускает приложение в трее без окна." => "Applied when saving. Starts in the tray without a window.",
 		"Не удалось сохранить настройки или автозапуск. Проверьте права и свободное место; повторите попытку." => "Unable to save settings or autostart. Check permissions and free space, then retry.",

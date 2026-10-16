@@ -54,6 +54,10 @@
 	}
 	function enforce(window) {
 		if (stopped) return;
+		if (String(window.desktopFileName) === "org.local.WhyHere" &&
+			(String(window.caption) === "Таймер" || String(window.caption) === "Timer")) {
+			window.keepAbove = true;
+		}
 		const app = appId(window);
 		const id = String(window.internalId);
 		if (app && blocked.indexOf(app) >= 0 && window.minimizable) {
