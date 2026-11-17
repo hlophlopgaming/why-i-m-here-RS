@@ -7,7 +7,7 @@ use std::{
 };
 use why_core::{
 	ipc::{self, UiMessage},
-	settings::{Settings, TrackedApp},
+	settings::{EndMode, Settings, TrackedApp},
 	windows::WindowInfo,
 	APP_ID,
 };
@@ -85,7 +85,12 @@ fn reply(pid: u32, message: &UiMessage) {
 }
 #[test]
 #[ignore = "requires private dbus-run-session and graphical desktop; mock KWin never controls actual windows"]
-fn real_goal_cancel_expiry_and_finish_button_route_to_window_close() {
+fn real_goal_cancel_expiry_and_finish_button_apply_selected_mode() {
+	for mode in [EndMode::CloseWindows, EndMode::Kill] {
+		real_session(mode);
+	}
+}
+fn real_session(mode: EndMode) {
 	let (sender, receiver) = mpsc::channel();
 	let connection = Builder::session()
 		.unwrap()
@@ -110,6 +115,8 @@ fn real_goal_cancel_expiry_and_finish_button_route_to_window_close() {
 		Profile(std::env::temp_dir().join(format!("why-here-real-test-{}", std::process::id())));
 	fs::create_dir_all(root.0.join("why-here")).unwrap();
 	let settings = Settings {
+		end_mode: mode,
+		play_sound: false,
 		tracked_apps: vec![TrackedApp {
 			id: "desktop:test.desktop".into(),
 			name: "Fixture".into(),
@@ -150,17 +157,18 @@ fn real_goal_cancel_expiry_and_finish_button_route_to_window_close() {
 			.unwrap();
 		serde_json::from_str(&response).unwrap()
 	};
-	let windows = vec![
+	let mut fixture = Daemon(Command::new("sleep").arg("30").spawn().unwrap());
+	let mut windows = vec![
 		WindowInfo {
 			id: "one".into(),
 			app_id: settings.tracked_apps[0].id.clone(),
-			pid: 123456,
+			pid: fixture.0.id(),
 			controllable: true,
 		},
 		WindowInfo {
 			id: "two".into(),
 			app_id: settings.tracked_apps[0].id.clone(),
-			pid: 123456,
+			pid: fixture.0.id(),
 			controllable: true,
 		},
 	];
@@ -188,9 +196,18 @@ fn real_goal_cancel_expiry_and_finish_button_route_to_window_close() {
 		.as_array()
 		.unwrap()
 		.is_empty());
-	wait(|| exchange(&windows, false)["close"].as_array().unwrap().len() == 2);
+	if mode == EndMode::Kill {
+		wait(|| fixture.0.try_wait().unwrap().is_some());
+	} else {
+		wait(|| exchange(&windows, false)["close"].as_array().unwrap().len() == 2);
+		assert!(fixture.0.try_wait().unwrap().is_none());
+	}
 	exchange(&[], false);
 	wait(|| child(daemon.0.id(), "timer").is_none());
+	fixture = Daemon(Command::new("sleep").arg("30").spawn().unwrap());
+	for window in &mut windows {
+		window.pid = fixture.0.id();
+	}
 	exchange(&windows, false);
 	wait(|| child(daemon.0.id(), "goal").is_some());
 	reply(
@@ -202,7 +219,12 @@ fn real_goal_cancel_expiry_and_finish_button_route_to_window_close() {
 	);
 	wait(|| child(daemon.0.id(), "timer").is_some());
 	reply(child(daemon.0.id(), "timer").unwrap(), &UiMessage::EndNow);
-	wait(|| exchange(&windows, false)["close"].as_array().unwrap().len() == 2);
+	if mode == EndMode::Kill {
+		wait(|| fixture.0.try_wait().unwrap().is_some());
+	} else {
+		wait(|| exchange(&windows, false)["close"].as_array().unwrap().len() == 2);
+		assert!(fixture.0.try_wait().unwrap().is_none());
+	}
 	exchange(&[], false);
 	let control = Proxy::new(
 		&connection,
@@ -212,6 +234,10 @@ fn real_goal_cancel_expiry_and_finish_button_route_to_window_close() {
 	)
 	.unwrap();
 	std::thread::sleep(Duration::from_millis(100));
+	fixture = Daemon(Command::new("sleep").arg("30").spawn().unwrap());
+	for window in &mut windows {
+		window.pid = fixture.0.id();
+	}
 	exchange(&windows, false);
 	wait(|| child(daemon.0.id(), "goal").is_some());
 	control
@@ -250,6 +276,7 @@ fn real_goal_cancel_expiry_and_finish_button_route_to_window_close() {
 		child(daemon.0.id(), "settings").is_none()
 	});
 	assert!(child(daemon.0.id(), "goal").is_none());
+	assert!(fixture.0.try_wait().unwrap().is_none());
 	assert_eq!(
 		serde_json::from_slice::<Settings>(&fs::read(&path).unwrap()).unwrap(),
 		updated

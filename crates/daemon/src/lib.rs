@@ -188,29 +188,46 @@ impl Drop for UiProcess {
 	}
 }
 
-fn play_warning_once(settings: &Settings, announced: &mut bool) {
-	if !settings.play_sound || *announced {
-		return;
+#[derive(Default)]
+struct SoundCues {
+	announced: bool,
+	last_countdown: Option<u64>,
+}
+impl SoundCues {
+	fn due(&mut self, settings: &Settings, seconds: u64) -> bool {
+		if !settings.play_sound || seconds == 0 {
+			return false;
+		}
+		let warning = !self.announced && seconds <= 60;
+		self.announced |= warning;
+		let countdown = seconds <= 10 && self.last_countdown.is_none_or(|last| seconds < last);
+		if countdown {
+			self.last_countdown = Some(seconds);
+		}
+		warning || countdown
 	}
-	*announced = true;
-	if let Err(error) = thread::Builder::new()
-		.name("warning-sound".into())
-		.spawn(|| {
-			if let Err(error) = platform::sound::play_warning() {
-				eprintln!("warning sound: {error}");
-			}
-		}) {
-		eprintln!("warning sound worker: {error}");
+	fn tick(&mut self, settings: &Settings, seconds: u64) {
+		if !self.due(settings, seconds) {
+			return;
+		}
+		if let Err(error) = thread::Builder::new()
+			.name("warning-sound".into())
+			.spawn(|| {
+				if let Err(error) = platform::sound::play_warning() {
+					eprintln!("warning sound: {error}");
+				}
+			}) {
+			eprintln!("warning sound worker: {error}");
+		}
 	}
 }
 
 fn timer(engine: &mut Engine, state: &UiState) -> Result<bool> {
 	let mut ui = UiProcess::spawn(Screen::Timer, state)?;
-	let mut announced = false;
+	let mut sounds = SoundCues::default();
 	loop {
 		let now = platform::boottime_ms()?;
 		if !engine.tick(now).is_empty() {
-			play_warning_once(&state.settings, &mut announced);
 			return Ok(true);
 		}
 		let remaining_ms = engine
@@ -218,9 +235,7 @@ fn timer(engine: &mut Engine, state: &UiState) -> Result<bool> {
 			.and_then(|session| session.remaining_ms(now))
 			.context("demo timer has no active session")?;
 		let warning = remaining_ms.div_ceil(1000) <= u64::from(state.settings.warning_secs);
-		if warning {
-			play_warning_once(&state.settings, &mut announced);
-		}
+		sounds.tick(&state.settings, remaining_ms.div_ceil(1000));
 		ui.send(&DaemonMessage::Tick {
 			remaining_secs: remaining_ms.div_ceil(1000),
 			warning,
@@ -354,5 +369,36 @@ pub fn run_demo(mut settings: Settings, first_screen: Screen, single_screen: boo
 		if single_screen {
 			return Ok(());
 		}
+	}
+}
+
+#[cfg(test)]
+mod sound_tests {
+	use super::*;
+	#[test]
+	fn warning_and_countdown_are_once_per_remaining_second() {
+		let settings = Settings {
+			play_sound: true,
+			..Settings::default()
+		};
+		let mut cues = SoundCues::default();
+		assert!(!cues.due(&settings, 61));
+		assert!(cues.due(&settings, 60));
+		assert!(!cues.due(&settings, 60));
+		assert!(!cues.due(&settings, 11));
+		for seconds in (1..=10).rev() {
+			assert!(cues.due(&settings, seconds));
+			assert!(!cues.due(&settings, seconds));
+		}
+		assert!(!cues.due(&settings, 0));
+		let mut cues = SoundCues::default();
+		assert!(cues.due(&settings, 7));
+		assert!(cues.due(&settings, 2));
+		assert!(!cues.due(&settings, 3));
+		let muted = Settings {
+			play_sound: false,
+			..settings
+		};
+		assert!(!SoundCues::default().due(&muted, 10));
 	}
 }

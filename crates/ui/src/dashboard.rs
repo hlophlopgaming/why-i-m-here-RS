@@ -212,7 +212,7 @@ pub(super) fn build(
 	duration_row.end();
 	let warning_row = field(
 		&mut main,
-		tr(language, "Предупредить за, мин (0 = в конце)"),
+		tr(language, "Подсветить таймер за, мин (0 = выкл.)"),
 	);
 	let warning = spinner(0, 0, 0, state.settings.warning_secs, true);
 	warning_row.end();
@@ -231,22 +231,18 @@ pub(super) fn build(
 	sound.set_value(state.settings.play_sound);
 	sound.set_tooltip(tr(
 		language,
-		"Один сигнал перед концом сессии. В Linux требуется pw-play.",
+		"Сигнал за минуту и каждую из последних 10 секунд. В Linux требуется pw-play.",
 	));
 	main.fixed(&sound, 24);
 	let mode_row = field(&mut main, tr(language, "При завершении новых сессий"));
 	let mut mode = Choice::default();
 	mode.add_choice(tr(language, "Закрыть окна"));
-	if demo {
-		mode.add_choice(tr(language, "Завершить процессы"));
-	} else {
-		mode.deactivate();
-		mode.set_tooltip(tr(
-			language,
-			"Обычное закрытие позволяет программе предложить сохранение документов.",
-		));
-	}
-	mode.set_value(if demo && state.settings.end_mode == EndMode::Kill {
+	mode.add_choice(tr(language, "Завершить процессы"));
+	mode.set_tooltip(tr(
+		language,
+		"Принудительное завершение может потерять несохранённые данные.",
+	));
+	mode.set_value(if state.settings.end_mode == EndMode::Kill {
 		1
 	} else {
 		0
@@ -262,7 +258,7 @@ pub(super) fn build(
 			if demo {
 				"Принудительное завершение может потерять несохранённые данные.\nВ деморежиме действие только имитируется."
 			} else {
-				"При запуске выбранной программы появится вопрос о цели. По окончании сессии программа закроется."
+				"При запуске появится вопрос о цели. Принудительное завершение может потерять несохранённые данные."
 			},
 		),
 	);
@@ -306,7 +302,7 @@ pub(super) fn build(
 			if demo {
 				"Активных сессий нет. Выберите программу и откройте форму цели."
 			} else {
-				"При запуске выбранной программы появится вопрос о цели. По окончании сессии программа закроется."
+				"При запуске появится вопрос о цели. Принудительное завершение может потерять несохранённые данные."
 			},
 		),
 	);

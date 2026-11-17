@@ -33,8 +33,9 @@ The application works locally, with no account, server or network requests.
 > [!IMPORTANT]
 > **Release v0.2.1 supports real sessions, the tray, settings and autostart.**
 > Selected applications are minimized behind the goal/time question. Answering shows
-> the application and its timer. Closing the question, timer expiry or **Finish session**
-> sends a normal close request to all application windows; the app can offer to save documents.
+> the application and its timer. Timer expiry and **Finish session** apply the selected mode:
+> close windows or forcibly terminate the app processes and their descendants. Forced
+> termination loses unsaved changes. Closing the goal prompt requests normal closure.
 > Demo mode leaves other applications untouched.
 > Release `v0.1.0` contains the earlier demo.
 
@@ -79,8 +80,8 @@ cargo run --release -p app -- --demo --show --language en
 | 🎯 **Set an intention** | Enter a goal before the timer starts. Start stays disabled until the goal is valid. |
 | ⏱ **Choose your time** | Use 5 / 15 / 30 minute presets or set 1–1440 minutes. |
 | 🗂 **Pick an application** | Search installed apps by name or ID; add and remove apps in the demo list. Nothing is launched. |
-| 🪟 **Keep the goal nearby** | A small, draggable, borderless panel stays above ordinary windows and shows the app, goal, remaining time and end mode. |
-| 🔔 **Get a warning** | The countdown turns amber near the deadline. Enable one warning sound per session if you want it. |
+| 🪟 **Keep the goal nearby** | A resizable panel stays above ordinary windows with larger goal text and timer, the app and end mode. |
+| 🔔 **Get a warning** | The countdown turns amber near the deadline. A sound warns at one minute and every second for the last 10 seconds. |
 | 🌐 **Use either language** | Russian and English; the dashboard's language choice applies to the next UI process. |
 | 🔒 **Keep it local** | No accounts, telemetry or app network requests. Demo settings and goal history disappear on exit. |
 
@@ -93,9 +94,9 @@ cargo run --release -p app -- --demo --show --language en
 - The session's end mode is fixed when it is created. **Finish session** shows
   the simulated result; Escape on the timer panel cancels without that action.
 - **Try again** opens another goal form with the previous goal.
-- A warning interval of **0** disables advance warning. Sound is off by default;
-  when enabled, the embedded WAV plays once at the warning or at expiry if no
-  warning has played yet. Sound errors do not stop the timer.
+- A highlight interval of **0** disables the visual warning. Sound is on by default:
+  a warning at one minute and a short beep every second for the last 10 seconds.
+  You can mute it in settings. Sound errors do not stop the timer.
 - The installed-app catalog loads only on request, in a worker. Linux reads XDG
   desktop entries; Windows enumerates the current user's AppsFolder via COM without
   starting PowerShell. Selection never
@@ -209,7 +210,16 @@ one app share a goal and timer. Windows stay minimized until you answer. Launchi
 after all windows have closed starts a new session. **Finish session** closes the
 app early; closing only the timer panel keeps the countdown running. Disabling
 tracking, removing an app or quitting the utility restores windows and cancels
-sessions without closing apps. Forced process termination remains a demo simulation.
+sessions without closing apps. New settings default to **Terminate processes**:
+pinned app processes and their descendants are terminated, children first. System
+processes, the utility and its ancestors, and other tracked apps are protected.
+Already detached background services are not searched by name or terminated.
+**Close windows** lets the app offer to save documents. Existing mode and sound
+preferences are preserved: select **Terminate processes**, enable sound, save,
+and start a new session to use the new behavior.
+The timer panel shows larger digits and goal text; drag its borders to resize it,
+with fonts growing along with the window. The minimum is 240×180; compact
+windows hide the status and end-mode captions. Demo termination is simulated.
 
 **Autostart:** enable **Start when signing in** in normal preferences and choose **Save
 and close**. It registers the current binary with `--background` using the XDG

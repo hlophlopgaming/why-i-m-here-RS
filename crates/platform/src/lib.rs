@@ -6,6 +6,7 @@ pub mod applications;
 pub mod autostart;
 pub mod desktop;
 pub mod instance;
+pub mod processes;
 pub mod settings;
 pub mod sound;
 pub mod windows;

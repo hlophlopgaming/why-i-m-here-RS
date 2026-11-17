@@ -89,7 +89,7 @@ pub fn tr(language: Language, source: &'static str) -> &'static str {
 		"Будет доступно после подключения платформенного бэкенда." => "Available once the platform backend is connected.",
 		"Удалить" => "Remove",
 		"Длительность по умолчанию, мин" => "Default duration, min",
-		"Предупредить за, мин (0 = в конце)" => "Warn before end, min (0 = at end)",
+		"Подсветить таймер за, мин (0 = выкл.)" => "Highlight before end, min (0 = off)",
 		"Непрозрачность напоминания" => "Reminder opacity",
 		"Прозрачность пока недоступна в нативном Wayland." => "Opacity is not yet available in native Wayland.",
 		"Звуковое предупреждение" => "Play a warning sound",
@@ -107,7 +107,7 @@ pub fn tr(language: Language, source: &'static str) -> &'static str {
 		"Браузер (демо)" => "Browser (demo)",
 		"Редактор (демо)" => "Editor (demo)",
 		"Мессенджер (демо)" => "Messenger (demo)",
-		"Один сигнал перед концом сессии. В Linux требуется pw-play." => "One warning per session. Linux requires pw-play.",
+		"Сигнал за минуту и каждую из последних 10 секунд. В Linux требуется pw-play." => "A warning at one minute and a beep every second for the last 10 seconds. Linux requires pw-play.",
 		"Отслеживаемые программы (демосессии)" => "Tracked applications (demo sessions)",
 		"Можно выбрать не более 64 программ." => "You can select up to 64 applications.",
 		"Установленные программы" => "Installed applications",
@@ -131,6 +131,8 @@ pub fn tr(language: Language, source: &'static str) -> &'static str {
 		"Выйти из приложения" => "Quit application",
 		"Закрыть настройки" => "Close settings",
 		"Доступны трей, настройки и деморежим. Отслеживание окон пока не подключено." => "Tray, preferences and demo mode are available. Window tracking is not connected yet.",
+		"Принудительное завершение может потерять несохранённые данные." => "Forced termination may lose unsaved data.",
+		"При запуске появится вопрос о цели. Принудительное завершение может потерять несохранённые данные." => "Launching an app opens the goal prompt. Forced termination may lose unsaved data.",
 		_ => source,
 	}
 }

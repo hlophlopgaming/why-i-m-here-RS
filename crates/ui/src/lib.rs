@@ -8,6 +8,7 @@ use fltk::{
 	app,
 	enums::{Event, Key, Shortcut},
 	frame::Frame,
+	group::Flex,
 	input::Input,
 	misc::Spinner,
 	prelude::*,
@@ -131,7 +132,7 @@ pub fn run(screen: Screen) -> Result<(), UiError> {
 	let (width, height) = match screen {
 		Screen::Settings => (820, 780),
 		Screen::Goal => (580, 310),
-		Screen::Timer => (360, 172),
+		Screen::Timer => (520, 330),
 		Screen::Reminder => (460, 240),
 	};
 	let mut window = Window::new(0, 0, width, height, None).center_screen();
@@ -349,23 +350,29 @@ fn session_panel(
 	window: &mut Window,
 ) -> (Frame, Frame) {
 	let language = state.settings.language;
-	window.set_border(false);
-	let mut app_name = text(16, 10, 328, 20, &state.app.name);
-	app_name.set_label_size(14);
-	let mut goal = text(16, 32, 328, 30, &state.goal);
+	let mut body = Flex::default_fill().column();
+	body.set_margins(18, 12, 18, 16);
+	body.set_pad(8);
+	let mut app_name = text(0, 0, 0, 0, &state.app.name);
+	app_name.set_label_size(16);
+	body.fixed(&app_name, 26);
+	let mut goal = text(0, 0, 0, 0, &state.goal);
+	goal.set_label_size(23);
 	goal.set_tooltip(&state.goal);
-	let time = text(
-		16,
-		64,
-		130,
-		22,
+	let mut time = text(
+		0,
+		0,
+		0,
+		0,
 		&time_label(u64::from(state.settings.duration_secs)),
 	);
+	time.set_label_size(64);
+	body.fixed(&time, 84);
 	let mut status = text(
-		150,
-		64,
-		194,
-		22,
+		0,
+		0,
+		0,
+		0,
 		tr(
 			language,
 			if state.demo {
@@ -376,11 +383,12 @@ fn session_panel(
 		),
 	);
 	status.set_label_color(theme::MUTED);
-	text(
-		16,
-		88,
-		328,
-		20,
+	body.fixed(&status, 22);
+	let mut mode = text(
+		0,
+		0,
+		0,
+		0,
 		tr(
 			language,
 			match state.settings.end_mode {
@@ -389,30 +397,39 @@ fn session_panel(
 			},
 		),
 	);
-	let mut end = button(12, 126, 336, 30, tr(language, "Закончить сессию"));
+	body.fixed(&mode, 22);
+	let mut end = button(0, 0, 0, 0, tr(language, "Закончить сессию"));
 	end.set_callback(move |_| sender.send(Action::Reply(UiMessage::EndNow)));
-	let mut drag = None;
-	window.handle(move |window, event| match event {
-		Event::Push if app::event_y() < 120 => {
-			drag = Some((
-				app::event_x_root() - window.x(),
-				app::event_y_root() - window.y(),
-			));
-			true
-		}
-		Event::Drag => {
-			if let Some((x, y)) = drag {
-				window.set_pos(app::event_x_root() - x, app::event_y_root() - y);
-				true
+	body.fixed(&end, 36);
+	body.end();
+	window.resizable(&body);
+	window.size_range(240, 180, 0, 0);
+	let mut resized_time = time.clone();
+	let mut resized_status = status.clone();
+	window.handle(move |window, event| {
+		if event == Event::Resize {
+			let scale = (window.w() as f64 / 520.0).min(window.h() as f64 / 330.0);
+			let compact = window.w() < 400 || window.h() < 290;
+			if compact {
+				resized_status.hide();
+				mode.hide();
 			} else {
-				false
+				resized_status.show();
+				mode.show();
 			}
+			let margin = if compact { 8 } else { 16 };
+			body.set_margins(margin, margin, margin, margin);
+			body.set_pad(if compact { 4 } else { 8 });
+			app_name.set_label_size(if compact { 13 } else { 16 });
+			body.fixed(&app_name, if compact { 20 } else { 26 });
+			body.fixed(&end, if compact { 30 } else { 36 });
+			resized_time.set_label_size((64.0 * scale).clamp(32.0, 180.0) as i32);
+			goal.set_label_size((23.0 * scale).clamp(13.0, 48.0) as i32);
+			body.fixed(&resized_time, (84.0 * scale).clamp(44.0, 220.0) as i32);
+			body.recalc();
+			window.redraw();
 		}
-		Event::Released => {
-			drag = None;
-			false
-		}
-		_ => false,
+		false
 	});
 	(time, status)
 }

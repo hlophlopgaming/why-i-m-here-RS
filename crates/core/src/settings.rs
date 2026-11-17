@@ -27,8 +27,8 @@ impl TrackedApp {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EndMode {
-	#[default]
 	CloseWindows,
+	#[default]
 	Kill,
 }
 
@@ -51,11 +51,11 @@ impl Default for Settings {
 		Self {
 			language: Language::Ru,
 			duration_secs: 15 * 60,
-			end_mode: EndMode::CloseWindows,
+			end_mode: EndMode::Kill,
 			goal_history: Vec::new(),
 			tracking_enabled: true,
-			warning_secs: 2 * 60,
-			play_sound: false,
+			warning_secs: 60,
+			play_sound: true,
 			autostart: false,
 			tracked_apps: Vec::new(),
 		}
@@ -142,8 +142,8 @@ mod tests {
 	fn new_settings_default_and_reject_invalid_tracking() {
 		let mut settings: Settings = serde_json::from_str("{}").unwrap();
 		assert!(settings.tracking_enabled);
-		assert!(!settings.play_sound);
-		assert_eq!(settings.warning_secs, 120);
+		assert!(settings.play_sound);
+		assert_eq!(settings.warning_secs, 60);
 		let app = TrackedApp {
 			id: "editor.desktop".into(),
 			name: "Editor".into(),
@@ -162,7 +162,7 @@ mod tests {
 		assert!(!settings.autostart);
 		assert_eq!(settings.duration_secs, 120);
 		assert_eq!(settings.language, Language::Ru);
-		assert_eq!(settings.end_mode, EndMode::CloseWindows);
+		assert_eq!(settings.end_mode, EndMode::Kill);
 		settings.validate().unwrap();
 	}
 

@@ -183,7 +183,7 @@ mod tests {
 		fs::write(&path, r#"{"duration_secs":120,"future":{"keep":true}}"#).unwrap();
 		let mut settings = load(&path).unwrap();
 		assert_eq!(settings.duration_secs, 120);
-		assert_eq!(settings.warning_secs, 120);
+		assert_eq!(settings.warning_secs, 60);
 		settings.remember_goal("Разобраться с настройками").unwrap();
 		settings.tracked_apps.push(why_core::settings::TrackedApp {
 			id: "editor.desktop.desktop".into(),

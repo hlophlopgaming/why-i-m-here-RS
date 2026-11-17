@@ -24,7 +24,8 @@ struct Session {
 	ui: Option<UiProcess>,
 	phase: Phase,
 	state: UiState,
-	warned: bool,
+	sounds: crate::SoundCues,
+	processes: platform::processes::Targets,
 }
 
 pub(crate) struct Tracking {
@@ -162,9 +163,8 @@ impl Tracking {
 			else {
 				continue;
 			};
-			self.engine.observe(&id, EndMode::CloseWindows)?;
-			let mut settings = self.settings.clone();
-			settings.end_mode = EndMode::CloseWindows;
+			self.engine.observe(&id, self.settings.end_mode)?;
+			let settings = self.settings.clone();
 			let state = UiState {
 				demo: false,
 				backend_available: true,
@@ -184,7 +184,8 @@ impl Tracking {
 							ui: Some(ui),
 							phase: Phase::Goal,
 							state,
-							warned: false,
+							sounds: crate::SoundCues::default(),
+							processes: platform::processes::Targets::default(),
 						},
 					);
 				}
@@ -197,11 +198,17 @@ impl Tracking {
 							ui: None,
 							phase: Phase::Closing,
 							state,
-							warned: false,
+							sounds: crate::SoundCues::default(),
+							processes: platform::processes::Targets::default(),
 						},
 					);
 					eprintln!("show goal: {error:#}");
 				}
+			}
+		}
+		for (id, session) in &mut self.sessions {
+			if session.state.settings.end_mode == EndMode::Kill && session.phase != Phase::Closing {
+				session.processes.update(id, &windows);
 			}
 		}
 		self.apply()
@@ -280,19 +287,26 @@ impl Tracking {
 	fn finish(&mut self, id: &str) -> Result<()> {
 		self.engine.forget(id);
 		if let Some(session) = self.sessions.get_mut(id) {
-			if session.phase == Phase::Timer && !session.warned && session.state.settings.play_sound
-			{
-				if let Err(error) = platform::sound::play_warning() {
-					eprintln!("warning sound: {error}");
-				}
-			}
 			session.phase = Phase::Closing;
 			session.ui = None;
 		}
-		if let Some(backend) = self.backend.as_mut() {
-			backend.close_app(id)?;
-		}
-		self.apply()
+		let result = (|| -> Result<()> {
+			if let Some(backend) = self.backend.as_mut() {
+				if let Some(session) = self.sessions.get(id) {
+					if session.state.settings.end_mode == EndMode::Kill
+						&& !session.state.goal.is_empty()
+					{
+						let windows = backend.snapshot()?;
+						session.processes.terminate(id, &windows)?;
+					} else {
+						backend.close_app(id)?;
+					}
+				}
+			}
+			Ok(())
+		})();
+		self.apply()?;
+		result
 	}
 	pub fn tick(&mut self) -> Result<()> {
 		let now = platform::boottime_ms()?;
@@ -321,14 +335,7 @@ impl Tracking {
 			let remaining_secs = remaining.div_ceil(1000);
 			let warning = session.state.settings.warning_secs > 0
 				&& remaining_secs <= u64::from(session.state.settings.warning_secs);
-			if warning && !session.warned {
-				session.warned = true;
-				if session.state.settings.play_sound {
-					if let Err(error) = platform::sound::play_warning() {
-						eprintln!("warning sound: {error}");
-					}
-				}
-			}
+			session.sounds.tick(&session.state.settings, remaining_secs);
 			if let Some(ui) = session.ui.as_mut() {
 				if let Err(error) = ui.send(&DaemonMessage::Tick {
 					remaining_secs,
