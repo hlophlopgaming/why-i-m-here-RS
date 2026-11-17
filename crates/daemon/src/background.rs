@@ -29,13 +29,11 @@ pub(crate) struct Events {
 }
 impl Events {
 	pub(crate) fn send(&self, event: Event) -> bool {
-		if self.sender.send(event).is_err() {
-			return false;
-		}
+		let sent = self.sender.send(event).is_ok();
 		#[cfg(windows)]
-		return platform::desktop::wake(self.thread);
+		return sent && platform::desktop::wake(self.thread);
 		#[cfg(not(windows))]
-		true
+		sent
 	}
 	pub fn request(&self, request: Request) -> bool {
 		self.send(Event::Request(request))
