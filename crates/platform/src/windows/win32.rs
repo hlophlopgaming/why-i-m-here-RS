@@ -380,15 +380,16 @@ fn identify(
 		let mut elevation = TOKEN_ELEVATION::default();
 		let mut size = 0;
 		// SAFETY: The owned token is queried into a correctly sized elevation structure.
-		unsafe {
+		let queried = unsafe {
 			GetTokenInformation(
 				token.0,
 				TokenElevation,
 				&mut elevation as *mut _ as *mut _,
 				std::mem::size_of_val(&elevation) as u32,
 				&mut size,
-			) != 0 && elevation.TokenIsElevated == 0
-		}
+			)
+		};
+		queried != 0 && elevation.TokenIsElevated == 0
 	} else {
 		false
 	};

@@ -46,13 +46,13 @@ impl Process {
 			.ok()
 			.and_then(|s| stat(&s).ok())
 			.map(|(_, time)| time);
+		let safe = pid > 1 && same_user && name.is_some();
 		let process = Self {
 			fd,
 			parent,
 			started,
 			parent_started,
-			safe: pid > 1
-				&& same_user && name.is_some()
+			safe: safe
 				&& ![
 					"kwin_wayland",
 					"kwin_x11",

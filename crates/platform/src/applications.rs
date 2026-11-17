@@ -92,11 +92,8 @@ mod linux {
 					continue;
 				}
 				let mut content = String::new();
-				if file
-					.take(256 * 1024 + 1)
-					.read_to_string(&mut content)
-					.is_err() || content.len() > 256 * 1024
-				{
+				let read = file.take(256 * 1024 + 1).read_to_string(&mut content);
+				if read.is_err() || content.len() > 256 * 1024 {
 					continue;
 				}
 				if let Some(name) = entry_name(&content, language, desktops) {
