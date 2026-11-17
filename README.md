@@ -210,7 +210,8 @@ one app share a goal and timer. Windows stay minimized until you answer. Launchi
 after all windows have closed starts a new session. **Finish session** closes the
 app early; closing only the timer panel keeps the countdown running. Disabling
 tracking, removing an app or quitting the utility restores windows and cancels
-sessions without closing apps. New settings default to **Terminate processes**:
+sessions without closing apps. **Close windows** is the default. To enable forced
+termination, choose **When new sessions end → Terminate processes**. In that mode,
 pinned app processes and their descendants are terminated, children first. System
 processes, the utility and its ancestors, and other tracked apps are protected.
 Already detached background services are not searched by name or terminated.

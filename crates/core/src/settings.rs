@@ -27,8 +27,8 @@ impl TrackedApp {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EndMode {
-	CloseWindows,
 	#[default]
+	CloseWindows,
 	Kill,
 }
 
@@ -51,7 +51,7 @@ impl Default for Settings {
 		Self {
 			language: Language::Ru,
 			duration_secs: 15 * 60,
-			end_mode: EndMode::Kill,
+			end_mode: EndMode::CloseWindows,
 			goal_history: Vec::new(),
 			tracking_enabled: true,
 			warning_secs: 60,
@@ -162,8 +162,26 @@ mod tests {
 		assert!(!settings.autostart);
 		assert_eq!(settings.duration_secs, 120);
 		assert_eq!(settings.language, Language::Ru);
-		assert_eq!(settings.end_mode, EndMode::Kill);
+		assert_eq!(settings.end_mode, EndMode::CloseWindows);
+		assert_eq!(EndMode::default(), EndMode::CloseWindows);
 		settings.validate().unwrap();
+	}
+
+	#[test]
+	fn explicitly_selected_termination_mode_survives_loading_and_saving() {
+		for (value, expected) in [
+			("close_windows", EndMode::CloseWindows),
+			("kill", EndMode::Kill),
+		] {
+			let json = format!(r#"{{"end_mode":"{value}"}}"#);
+			let settings: Settings = serde_json::from_str(&json).unwrap();
+			assert_eq!(settings.end_mode, expected);
+			let saved = serde_json::to_string(&settings).unwrap();
+			assert_eq!(
+				serde_json::from_str::<Settings>(&saved).unwrap().end_mode,
+				expected
+			);
+		}
 	}
 
 	#[test]
