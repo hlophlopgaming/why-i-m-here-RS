@@ -281,7 +281,7 @@ is active. The UI never manages other applications' windows or processes.
 
 ```mermaid
 flowchart LR
-    D["why-here · controller"] <-->|"stdin / stdout · JSON v5"| U["why-here ui · fltk-rs"]
+    D["why-here · controller"] <-->|"stdin / stdout · JSON v6"| U["why-here ui · fltk-rs"]
     D --> C["core · sessions"]
     D --> P["platform · clock, catalog, sound"]
 ```
@@ -296,8 +296,8 @@ flowchart LR
 
 The engine supports independent application sessions, preserves exact app IDs
 and fixes each session's end mode. Clocks use `CLOCK_BOOTTIME` on Linux and
-`QueryInterruptTime` on Windows. IPC version 5 rejects unsupported versions and
-messages over 64 KiB; catalogs are streamed in small chunks.
+`QueryInterruptTime` on Windows. IPC version 6 rejects unsupported versions and
+messages over 256 KiB; catalogs are streamed in small chunks.
 
 </details>
 

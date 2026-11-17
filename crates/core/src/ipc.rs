@@ -6,7 +6,8 @@ use thiserror::Error;
 use crate::settings::{Settings, TrackedApp};
 
 pub const PROTOCOL_VERSION: u16 = 6;
-pub const MAX_MESSAGE_BYTES: usize = 64 * 1024;
+// Allow all validated settings, including JSON escaping of the full goal history.
+pub const MAX_MESSAGE_BYTES: usize = 256 * 1024;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -98,7 +99,7 @@ pub enum IpcError {
 	Json(#[from] serde_json::Error),
 	#[error("unsupported IPC version: {0}")]
 	Version(u16),
-	#[error("IPC message exceeds 64 KiB or is missing its newline")]
+	#[error("IPC message exceeds 256 KiB or is missing its newline")]
 	Framing,
 }
 
@@ -137,6 +138,49 @@ pub fn write_message<T: Serialize>(writer: &mut impl Write, payload: &T) -> Resu
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn largest_valid_settings_fit_initialization_and_save_frames() {
+		let settings = Settings {
+			tracked_apps: (0..64)
+				.map(|index| TrackedApp {
+					id: format!("{index:02}{}", "\\".repeat(510)),
+					name: "😀".repeat(128),
+				})
+				.collect(),
+			goal_history: vec![
+				"\0".repeat(crate::settings::MAX_GOAL_CHARS);
+				crate::settings::MAX_HISTORY
+			],
+			..Settings::default()
+		};
+		settings.validate().unwrap();
+		let message = DaemonMessage::Init {
+			screen: Screen::Settings,
+			state: UiState {
+				demo: false,
+				backend_available: true,
+				backend_restricted: false,
+				app: settings.tracked_apps[0].clone(),
+				goal: settings.goal_history[0].clone(),
+				settings: settings.clone(),
+			},
+		};
+		let mut bytes = Vec::new();
+		write_message(&mut bytes, &message).unwrap();
+		let Some(DaemonMessage::Init { state, .. }) = read_message(&mut bytes.as_slice()).unwrap()
+		else {
+			panic!("missing initialization")
+		};
+		assert_eq!(state.settings, settings);
+		let message = UiMessage::SaveSettings { settings };
+		bytes.clear();
+		write_message(&mut bytes, &message).unwrap();
+		assert_eq!(
+			read_message::<UiMessage>(&mut bytes.as_slice()).unwrap(),
+			Some(message)
+		);
+	}
 
 	#[test]
 	fn borrowed_catalog_fits_frame_and_matches_owned_response() {
