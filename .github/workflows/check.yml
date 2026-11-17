@@ -32,6 +32,6 @@ jobs:
         run: >-
           python -c "from pathlib import Path;
           assert any('#define FLTK_USE_WAYLAND 1' in p.read_text()
-          for p in Path('target/debug/build').glob('fltk-sys-*/out/include/FL/fl_config.h')),
+          for p in Path('target/debug/build').glob('fltk-sys*/**/out/include/FL/fl_config.h')),
           'FLTK was built without native Wayland support'"
       - run: git diff --check
